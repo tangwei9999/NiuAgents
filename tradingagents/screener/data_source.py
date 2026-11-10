@@ -12,8 +12,6 @@
 
 import functools
 import logging
-import time
-from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -62,7 +60,7 @@ class NoDataError(DataSourceError):
 # 通用技术指标计算
 # ============================================================
 
-def _compute_technical_indicators(df: pd.DataFrame, ticker: str) -> Optional[Dict]:
+def _compute_technical_indicators(df: pd.DataFrame, ticker: str) -> dict | None:
     """
     从 DataFrame 计算技术指标。
 
@@ -130,14 +128,14 @@ def _compute_technical_indicators(df: pd.DataFrame, ticker: str) -> Optional[Dic
 def get_baostock_available() -> bool:
     """检查 BaoStock 是否可用。"""
     try:
-        import baostock as bs
+        import baostock  # noqa: F401  # 可用性探测
         return True
     except ImportError:
         return False
 
 
 @_bounded_baostock_session
-def get_stock_list_baostock() -> List[Dict[str, str]]:
+def get_stock_list_baostock() -> list[dict[str, str]]:
     """
     从 BaoStock 获取 A 股股票列表。
 
@@ -158,9 +156,7 @@ def get_stock_list_baostock() -> List[Dict[str, str]]:
             row = rs.get_row_data()
             code = row[0]  # 证券代码
             name = row[1]  # 证券名称
-            ipo_date = row[2]  # 上市日期
-            delist_date = row[3]  # 退市日期
-            stock_type = row[4]  # 证券类型
+            delist_date = row[3]  # 退市日期（row[2] 上市日期、row[4] 证券类型用不到）
 
             # 跳过已退市
             if delist_date and delist_date != '':
@@ -190,13 +186,13 @@ def get_stock_list_baostock() -> List[Dict[str, str]]:
         return stocks
 
     except ImportError:
-        raise DataSourceUnavailableError("BaoStock 未安装")
+        raise DataSourceUnavailableError("BaoStock 未安装") from None
     except Exception as e:
-        raise DataSourceError(f"BaoStock 获取失败：{e}")
+        raise DataSourceError(f"BaoStock 获取失败：{e}") from e
 
 
 @_bounded_baostock_session
-def get_technical_data_baostock(ticker: str, days: int = 90) -> Optional[Dict]:
+def get_technical_data_baostock(ticker: str, days: int = 90) -> dict | None:
     """
     从 BaoStock 获取股票技术指标。
 
@@ -261,7 +257,7 @@ def get_technical_data_baostock(ticker: str, days: int = 90) -> Optional[Dict]:
 # 数据源 2: AKShare 腾讯财经（限流少）
 # ============================================================
 
-def get_technical_data_akshare_tx(ticker: str, days: int = 90) -> Optional[Dict]:
+def get_technical_data_akshare_tx(ticker: str, days: int = 90) -> dict | None:
     """
     从 AKShare 腾讯财经接口获取股票技术指标。
 
@@ -310,7 +306,7 @@ def get_technical_data_akshare_tx(ticker: str, days: int = 90) -> Optional[Dict]
         err_str = str(e)
         if "限流" in err_str or "Rate" in err_str or "push2" in err_str:
             logger.debug(f"AKShare 腾讯限流：{e}")
-            raise DataSourceUnavailableError(f"AKShare 腾讯限流：{e}")
+            raise DataSourceUnavailableError(f"AKShare 腾讯限流：{e}") from e
         logger.debug(f"AKShare 腾讯获取 {ticker} 失败：{e}")
         return None
 
@@ -319,7 +315,7 @@ def get_technical_data_akshare_tx(ticker: str, days: int = 90) -> Optional[Dict]
 # 数据源 3: AKShare 新浪财经（较稳定）
 # ============================================================
 
-def get_technical_data_akshare_sina(ticker: str, days: int = 90) -> Optional[Dict]:
+def get_technical_data_akshare_sina(ticker: str, days: int = 90) -> dict | None:
     """
     从 AKShare 新浪财经接口获取股票技术指标。
 
@@ -361,7 +357,7 @@ def get_technical_data_akshare_sina(ticker: str, days: int = 90) -> Optional[Dic
         err_str = str(e)
         if "限流" in err_str or "Rate" in err_str:
             logger.debug(f"AKShare 新浪限流：{e}")
-            raise DataSourceUnavailableError(f"AKShare 新浪限流：{e}")
+            raise DataSourceUnavailableError(f"AKShare 新浪限流：{e}") from e
         logger.debug(f"AKShare 新浪获取 {ticker} 失败：{e}")
         return None
 
@@ -373,13 +369,13 @@ def get_technical_data_akshare_sina(ticker: str, days: int = 90) -> Optional[Dic
 def get_akshare_available() -> bool:
     """检查 AKShare 是否可用。"""
     try:
-        import akshare as ak
+        import akshare  # noqa: F401  # 可用性探测
         return True
     except ImportError:
         return False
 
 
-def get_stock_list_akshare() -> List[Dict[str, str]]:
+def get_stock_list_akshare() -> list[dict[str, str]]:
     """
     从 AKShare（东方财富）获取 A 股股票列表。
 
@@ -429,14 +425,14 @@ def get_stock_list_akshare() -> List[Dict[str, str]]:
         return stocks
 
     except ImportError:
-        raise DataSourceUnavailableError("AKShare 未安装")
+        raise DataSourceUnavailableError("AKShare 未安装") from None
     except Exception as e:
         if "Too Many" in str(e) or "Rate" in str(e) or "限流" in str(e):
-            raise DataSourceUnavailableError(f"AKShare 限流：{e}")
-        raise DataSourceError(f"AKShare 获取失败：{e}")
+            raise DataSourceUnavailableError(f"AKShare 限流：{e}") from e
+        raise DataSourceError(f"AKShare 获取失败：{e}") from e
 
 
-def get_technical_data_akshare_em(ticker: str, days: int = 90) -> Optional[Dict]:
+def get_technical_data_akshare_em(ticker: str, days: int = 90) -> dict | None:
     """
     从 AKShare 东方财富接口获取股票技术指标。
 
@@ -477,7 +473,7 @@ def get_technical_data_akshare_em(ticker: str, days: int = 90) -> Optional[Dict]
         err_str = str(e)
         if "限流" in err_str or "Rate" in err_str or "push2" in err_str:
             logger.debug(f"AKShare 东财限流：{e}")
-            raise DataSourceUnavailableError(f"AKShare 东财限流：{e}")
+            raise DataSourceUnavailableError(f"AKShare 东财限流：{e}") from e
         logger.debug(f"AKShare 东财获取 {ticker} 失败：{e}")
         return None
 
@@ -486,7 +482,7 @@ def get_technical_data_akshare_em(ticker: str, days: int = 90) -> Optional[Dict]
 # 内置股票池（最后兜底）
 # ============================================================
 
-def get_stock_list_builtin() -> List[Dict[str, str]]:
+def get_stock_list_builtin() -> list[dict[str, str]]:
     """返回内置股票池。
 
     这个环节以前叫 get_stock_list_yahoo，但它一行 Yahoo 代码都没调过；继续挂
@@ -496,14 +492,14 @@ def get_stock_list_builtin() -> List[Dict[str, str]]:
         from tradingagents.screener.stock_universe import _get_builtin_stocks
         return _get_builtin_stocks()
     except Exception as e:
-        raise DataSourceError(f"内置股票池读取失败：{e}")
+        raise DataSourceError(f"内置股票池读取失败：{e}") from e
 
 
 # ============================================================
 # 统一回退接口
 # ============================================================
 
-def get_stock_list_with_fallback() -> List[Dict[str, str]]:
+def get_stock_list_with_fallback() -> list[dict[str, str]]:
     """
     获取股票列表（带回退机制）。
 
@@ -552,7 +548,7 @@ def get_stock_list_with_fallback() -> List[Dict[str, str]]:
     raise DataSourceUnavailableError(f"所有数据源都失败：{'; '.join(errors)}")
 
 
-def get_technical_data_with_fallback(ticker: str) -> Optional[Dict]:
+def get_technical_data_with_fallback(ticker: str) -> dict | None:
     """
     获取技术指标（带回退机制）。
 
@@ -580,7 +576,7 @@ def get_technical_data_with_fallback(ticker: str) -> Optional[Dict]:
                 logger.info(f"✓ BaoStock 成功获取 {ticker}")
                 return data
             else:
-                logger.info(f"BaoStock 返回空数据，尝试下一个源")
+                logger.info("BaoStock 返回空数据，尝试下一个源")
         except Exception as e:
             logger.info(f"BaoStock 获取 {ticker} 失败：{e}，尝试下一个源")
 
@@ -593,9 +589,9 @@ def get_technical_data_with_fallback(ticker: str) -> Optional[Dict]:
                 logger.info(f"✓ AKShare 腾讯成功获取 {ticker}")
                 return data
             else:
-                logger.info(f"AKShare 腾讯返回空数据，尝试下一个源")
+                logger.info("AKShare 腾讯返回空数据，尝试下一个源")
         except DataSourceUnavailableError:
-            logger.info(f"AKShare 腾讯限流，跳过")
+            logger.info("AKShare 腾讯限流，跳过")
         except Exception as e:
             logger.info(f"AKShare 腾讯获取 {ticker} 失败：{e}，尝试下一个源")
 
@@ -608,9 +604,9 @@ def get_technical_data_with_fallback(ticker: str) -> Optional[Dict]:
                 logger.info(f"✓ AKShare 新浪成功获取 {ticker}")
                 return data
             else:
-                logger.info(f"AKShare 新浪返回空数据，尝试下一个源")
+                logger.info("AKShare 新浪返回空数据，尝试下一个源")
         except DataSourceUnavailableError:
-            logger.info(f"AKShare 新浪限流，跳过")
+            logger.info("AKShare 新浪限流，跳过")
         except Exception as e:
             logger.info(f"AKShare 新浪获取 {ticker} 失败：{e}，尝试下一个源")
 
@@ -623,9 +619,9 @@ def get_technical_data_with_fallback(ticker: str) -> Optional[Dict]:
                 logger.info(f"✓ AKShare 东财成功获取 {ticker}")
                 return data
             else:
-                logger.info(f"AKShare 东财返回空数据")
+                logger.info("AKShare 东财返回空数据")
         except DataSourceUnavailableError:
-            logger.info(f"AKShare 东财限流，跳过")
+            logger.info("AKShare 东财限流，跳过")
         except Exception as e:
             logger.info(f"AKShare 东财获取 {ticker} 失败：{e}")
 

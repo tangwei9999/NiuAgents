@@ -6,17 +6,6 @@ from tradingagents.dataflows.errors import (
     VendorNotConfiguredError,
     VendorUnavailableError,
 )
-from tradingagents.dataflows.vendors.alpha_vantage import (
-    get_balance_sheet as get_alpha_vantage_balance_sheet,
-    get_cashflow as get_alpha_vantage_cashflow,
-    get_fundamentals as get_alpha_vantage_fundamentals,
-    get_global_news as get_alpha_vantage_global_news,
-    get_income_statement as get_alpha_vantage_income_statement,
-    get_indicator as get_alpha_vantage_indicator,
-    get_insider_transactions as get_alpha_vantage_insider_transactions,
-    get_news as get_alpha_vantage_news,
-    get_stock as get_alpha_vantage_stock,
-)
 from tradingagents.dataflows.vendors.akshare import (
     get_balance_sheet as get_akshare_balance_sheet,
     get_cashflow as get_akshare_cashflow,
@@ -27,6 +16,17 @@ from tradingagents.dataflows.vendors.akshare import (
     get_insider_transactions as get_akshare_insider_transactions,
     get_news as get_akshare_news,
     get_stock_data as get_akshare_stock_data,
+)
+from tradingagents.dataflows.vendors.alpha_vantage import (
+    get_balance_sheet as get_alpha_vantage_balance_sheet,
+    get_cashflow as get_alpha_vantage_cashflow,
+    get_fundamentals as get_alpha_vantage_fundamentals,
+    get_global_news as get_alpha_vantage_global_news,
+    get_income_statement as get_alpha_vantage_income_statement,
+    get_indicator as get_alpha_vantage_indicator,
+    get_insider_transactions as get_alpha_vantage_insider_transactions,
+    get_news as get_alpha_vantage_news,
+    get_stock as get_alpha_vantage_stock,
 )
 from tradingagents.dataflows.vendors.fred import get_macro_data as get_fred_macro_data
 from tradingagents.dataflows.vendors.polymarket import (

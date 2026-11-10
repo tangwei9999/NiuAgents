@@ -123,8 +123,8 @@ def _normalize_date_arg(value) -> str:
 
 def get_stock_data(
     symbol: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     **kwargs
 ) -> pd.DataFrame:
     """
@@ -163,8 +163,8 @@ def get_stock_data(
     except Exception as e:
         error_msg = str(e)
         if "限流" in error_msg or "Rate" in error_msg or "push2" in error_msg:
-            raise VendorUnavailableError(f"AKShare East Money rate limited: {e}")
-        raise VendorUnavailableError(f"AKShare East Money failed: {e}")
+            raise VendorUnavailableError(f"AKShare East Money rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
 
     # East Money occasionally returns an empty frame right after throttling
     # (especially under batch analysis load); retry once before giving up.
@@ -179,7 +179,7 @@ def get_stock_data(
                 adjust="qfq"
             )
         except Exception as e:
-            raise VendorUnavailableError(f"AKShare East Money failed: {e}")
+            raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
 
     if df.empty:
         # Raised outside the request try/except so the router can treat it as
@@ -212,8 +212,8 @@ def get_stock_data(
 
 def get_indicators(
     symbol: str,
-    indicator: Optional[str] = None,
-    curr_date: Optional[str] = None,
+    indicator: str | None = None,
+    curr_date: str | None = None,
     look_back_days: int = 30,
     **kwargs
 ) -> str:
@@ -261,12 +261,12 @@ def get_indicators(
     try:
         series = stock_df[ind]
     except Exception as e:
-        raise VendorUnavailableError(f"Indicator '{ind}' not supported via stockstats: {e}")
+        raise VendorUnavailableError(f"Indicator '{ind}' not supported via stockstats: {e}") from e
 
     cutoff = pd.Timestamp(end) - pd.Timedelta(days=days)
     mask = frame["Date"] >= cutoff
     lines = []
-    for dt, val in zip(frame.loc[mask, "Date"], series.loc[mask]):
+    for dt, val in zip(frame.loc[mask, "Date"], series.loc[mask], strict=False):
         value = "N/A" if pd.isna(val) else f"{float(val):.4f}"
         lines.append(f"{dt.strftime('%Y-%m-%d')}: {value}")
 
@@ -280,7 +280,7 @@ def get_indicators(
 
 def get_fundamentals(
     symbol: str,
-    as_of_date: Optional[str] = None,
+    as_of_date: str | None = None,
     **kwargs
 ) -> dict:
     """
@@ -324,14 +324,14 @@ def get_fundamentals(
     except Exception as e:
         error_msg = str(e)
         if "限流" in error_msg or "Rate" in error_msg:
-            raise VendorUnavailableError(f"AKShare rate limited: {e}")
-        raise VendorUnavailableError(f"AKShare fundamentals failed: {e}")
+            raise VendorUnavailableError(f"AKShare rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare fundamentals failed: {e}") from e
 
 
 def get_balance_sheet(
     symbol: str,
     freq: str = "quarterly",
-    as_of_date: Optional[str] = None,
+    as_of_date: str | None = None,
     **kwargs
 ) -> pd.DataFrame:
     """
@@ -363,8 +363,8 @@ def get_balance_sheet(
     except Exception as e:
         error_msg = str(e)
         if "限流" in error_msg or "Rate" in error_msg:
-            raise VendorUnavailableError(f"AKShare rate limited: {e}")
-        raise VendorUnavailableError(f"AKShare balance sheet failed: {e}")
+            raise VendorUnavailableError(f"AKShare rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare balance sheet failed: {e}") from e
 
 
 # Router/tool calling convention: (symbol, freq, as_of_date). All three
@@ -373,7 +373,7 @@ def get_balance_sheet(
 def get_cashflow(
     symbol: str,
     freq: str = "quarterly",
-    as_of_date: Optional[str] = None,
+    as_of_date: str | None = None,
     **kwargs
 ) -> pd.DataFrame:
     return get_balance_sheet(symbol, freq=freq, as_of_date=as_of_date, **kwargs)
@@ -382,13 +382,13 @@ def get_cashflow(
 def get_income_statement(
     symbol: str,
     freq: str = "quarterly",
-    as_of_date: Optional[str] = None,
+    as_of_date: str | None = None,
     **kwargs
 ) -> pd.DataFrame:
     return get_balance_sheet(symbol, freq=freq, as_of_date=as_of_date, **kwargs)
 
 
-def _china_code(symbol: str) -> Optional[str]:
+def _china_code(symbol: str) -> str | None:
     """The 6-digit East Money code for a China listing, or None for anything else.
 
     AKShare's endpoints are keyed on the A-share code, so a US, HK or crypto
@@ -430,9 +430,9 @@ def _read_news_frame(fetch, symbol: str, vendor_note: str):
 
 def get_news(
     symbol: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    limit: Optional[int] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    limit: int | None = None,
     **kwargs
 ) -> str:
     """
@@ -509,9 +509,9 @@ def get_news(
 
 
 def get_global_news(
-    curr_date: Optional[str] = None,
-    look_back_days: Optional[int] = None,
-    limit: Optional[int] = None,
+    curr_date: str | None = None,
+    look_back_days: int | None = None,
+    limit: int | None = None,
     **kwargs
 ) -> str:
     """

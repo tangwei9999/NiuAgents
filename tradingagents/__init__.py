@@ -4,6 +4,7 @@ __version__ = "0.7.1"
 
 import os
 from pathlib import Path
+
 from dotenv import find_dotenv, load_dotenv
 
 # Load .env at package import so DEFAULT_CONFIG's env-var overlay and every LLM

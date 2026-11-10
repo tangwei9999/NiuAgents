@@ -70,7 +70,9 @@ filterwarnings = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["results"]
+# results/ is generated output; screener/test_*.py are local smoke scripts that
+# never enter the repo (see .gitignore), so they stay out of linting too.
+extend-exclude = ["results", "tradingagents/screener/test_*.py"]
 
 [tool.ruff.lint]
 # Standard "good defaults" rule set (pyflakes + pycodestyle + isort + bugbear +

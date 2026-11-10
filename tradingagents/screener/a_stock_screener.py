@@ -9,7 +9,6 @@
 
 import argparse
 import logging
-import sys
 from datetime import date
 from pathlib import Path
 
@@ -17,13 +16,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from tradingagents.screener.stock_universe import get_csi300_stocks, filter_st_stocks
+from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.screener.batch_analyzer import batch_analyze
 from tradingagents.screener.pre_screener import get_technical_indicators_batch
 from tradingagents.screener.pre_screener_v2 import pre_screen_stocks_multi_factor
-from tradingagents.screener.batch_analyzer import batch_analyze
-from tradingagents.screener.scorer import rank_stocks, print_ranking
 from tradingagents.screener.price_levels import attach_price_levels, format_level_line
-from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.screener.scorer import print_ranking, rank_stocks
+from tradingagents.screener.stock_universe import filter_st_stocks, get_csi300_stocks
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -85,11 +84,10 @@ def run_screener(
     console.print("  从全市场筛选主力净流入 > 0 的股票（取前 100 只）...")
 
     from tradingagents.screener.pre_screener_v2 import (
-        get_stock_list_by_fund_flow,
+        filter_by_news_sector,
         get_last_window_note,
         get_positive_news_sectors,
-        filter_by_news_sector,
-        pre_screen_stocks_multi_factor,
+        get_stock_list_by_fund_flow,
     )
     fund_flow_stocks = get_stock_list_by_fund_flow(min_inflow=0, max_stocks=100)
 
@@ -184,9 +182,9 @@ def run_screener(
         console.print(f"  [bold cyan]{i:2d}.[/bold cyan] {name} ({ticker})")
         console.print(f"      潜力评分: [bold yellow]{score}[/bold yellow] | RSI: {rsi:.1f} | 主力净流入: {inflow:.0f}万 | 板块: {sector} | 消息面: {news_score}分")
 
-    console.print(f"\n[bold green]═══════════════════════════════════════════════════════════[/bold green]")
+    console.print("\n[bold green]═══════════════════════════════════════════════════════════[/bold green]")
     console.print(f"[bold green]  共找到 {len(screened)} 只潜力股[/bold green]")
-    console.print(f"[bold green]═══════════════════════════════════════════════════════════[/bold green]\n")
+    console.print("[bold green]═══════════════════════════════════════════════════════════[/bold green]\n")
 
     # 询问是否继续深度分析。--yes 时不问：无人值守的终端没有 tty 可回答，
     # 卡在确认上等于整次跑掉什么也没留下。
@@ -299,13 +297,13 @@ def run_screener(
                     f.write(f"- 支撑位：{levels.get('support', 0):.2f}（近 {levels.get('bars', 0)} 个交易日最低价）\n")
                     f.write(f"- 建议买入价：{levels.get('buy_price', 0):.2f}\n")
                     f.write(f"- 建议卖出价：{levels.get('sell_price', 0):.2f}\n\n")
-                f.write(f"## 细分得分\n\n")
+                f.write("## 细分得分\n\n")
                 scores = stock.get("scores", {})
                 f.write(f"- LLM 评级：{scores.get('rating', 0):.1f}\n")
                 f.write(f"- 技术面：{scores.get('technical', 0):.1f}\n")
                 f.write(f"- 资金面：{scores.get('volume', 0):.1f}\n")
                 f.write(f"- 动量：{scores.get('momentum', 0):.1f}\n\n")
-                f.write(f"## 交易决策\n\n")
+                f.write("## 交易决策\n\n")
                 f.write(stock.get("decision", "无") + "\n")
 
             console.print(f"  ✓ {stock['name']} 摘要已保存：{report_file}")

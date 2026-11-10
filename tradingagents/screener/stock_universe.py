@@ -5,12 +5,11 @@
 """
 
 import logging
-from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
 
-def _get_builtin_stocks() -> List[Dict[str, str]]:
+def _get_builtin_stocks() -> list[dict[str, str]]:
     """获取内置股票池（兜底方案）。"""
     return [
         # 白酒/消费
@@ -62,7 +61,7 @@ def _get_builtin_stocks() -> List[Dict[str, str]]:
     ]
 
 
-def get_csi300_stocks() -> List[Dict[str, str]]:
+def get_csi300_stocks() -> list[dict[str, str]]:
     """
     获取股票池（使用多源回退机制）。
 
@@ -87,7 +86,7 @@ def get_csi300_stocks() -> List[Dict[str, str]]:
         return stocks
 
 
-def filter_st_stocks(stocks: List[Dict[str, str]]) -> List[Dict[str, str]]:
+def filter_st_stocks(stocks: list[dict[str, str]]) -> list[dict[str, str]]:
     """
     剔除 ST/*ST 股票、科创板、北交所股票。
 

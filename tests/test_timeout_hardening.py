@@ -144,12 +144,14 @@ def test_disabling_an_optional_category_makes_no_request(fred_vendor):
     from tradingagents.dataflows import router
     from tradingagents.dataflows.config import run_config
 
-    with mock.patch.object(fred_vendor, "get_api_key",
-                           side_effect=AssertionError("FRED must not be consulted")):
-        with run_config({"data_vendors": {"macro_data": "none",
-                                          "prediction_markets": "none"}}):
-            macro = router.route_to_vendor("get_macro_indicators", "cpi", "2026-11-10", 365)
-            markets = router.route_to_vendor("get_prediction_markets", "Fed rate cut", 5, None)
+    with (
+        mock.patch.object(fred_vendor, "get_api_key",
+                          side_effect=AssertionError("FRED must not be consulted")),
+        run_config({"data_vendors": {"macro_data": "none",
+                                     "prediction_markets": "none"}}),
+    ):
+        macro = router.route_to_vendor("get_macro_indicators", "cpi", "2026-11-10", 365)
+        markets = router.route_to_vendor("get_prediction_markets", "Fed rate cut", 5, None)
 
     assert macro.startswith("DATA_UNAVAILABLE")
     assert markets.startswith("DATA_UNAVAILABLE")
@@ -162,9 +164,11 @@ def test_a_core_category_cannot_be_disabled():
     from tradingagents.dataflows import router
     from tradingagents.dataflows.config import run_config
 
-    with run_config({"data_vendors": {"core_stock_apis": "none"}}):
-        with pytest.raises(ValueError, match="core and cannot be disabled"):
-            router.route_to_vendor("get_stock_data", "600519.SS", "2026-08-01", "2026-11-10")
+    with (
+        run_config({"data_vendors": {"core_stock_apis": "none"}}),
+        pytest.raises(ValueError, match="core and cannot be disabled"),
+    ):
+        router.route_to_vendor("get_stock_data", "600519.SS", "2026-08-01", "2026-11-10")
 
 
 @pytest.mark.unit
@@ -176,9 +180,8 @@ def test_an_empty_vendor_list_is_not_read_as_disabled():
     with mock.patch.object(router, "VENDOR_METHODS", {
         **router.VENDOR_METHODS,
         "get_stock_data": {"akshare": lambda *a, **k: "OK"},
-    }):
-        with run_config({"data_vendors": {"core_stock_apis": ""}}):
-            assert router.route_to_vendor("get_stock_data", "600519.SS", "a", "b") == "OK"
+    }), run_config({"data_vendors": {"core_stock_apis": ""}}):
+        assert router.route_to_vendor("get_stock_data", "600519.SS", "a", "b") == "OK"
 
 
 @pytest.mark.unit
@@ -281,10 +284,12 @@ def test_a_failed_news_request_is_the_vendors_problem_not_the_listings():
 
     ak = mock.Mock()
     ak.stock_news_em.side_effect = RuntimeError("connection reset")
-    with mock.patch.dict("sys.modules", {"akshare": ak}), \
-         mock.patch.object(akshare, "_check_akshare_available", lambda: True):
-        with pytest.raises(VendorUnavailableError):
-            akshare.get_news("002371.SZ", "2026-10-04", "2026-11-10")
+    with (
+        mock.patch.dict("sys.modules", {"akshare": ak}),
+        mock.patch.object(akshare, "_check_akshare_available", lambda: True),
+        pytest.raises(VendorUnavailableError),
+    ):
+        akshare.get_news("002371.SZ", "2026-10-04", "2026-11-10")
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +305,7 @@ def test_akshare_is_put_on_a_budget_of_its_own():
     one interface meeting a stalled East Money could spend three quarters of a
     minute before the router saw the failure. Importing the vendor caps that."""
     from akshare.utils.context import config
+
     from tradingagents.dataflows.vendors import akshare as akshare_vendor
 
     connect, read = config.timeout
@@ -344,9 +350,11 @@ def test_a_socket_opened_under_the_guard_inherits_it_and_nothing_does():
     a bare ``socket.socket()`` gets the budget copied onto it at creation --
     and that the guard is removed again on the way out."""
     previous = socket.getdefaulttimeout()
-    with net.bounded_sockets(seconds=2.0):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            assert sock.gettimeout() == 2.0
+    with (
+        net.bounded_sockets(seconds=2.0),
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock,
+    ):
+        assert sock.gettimeout() == 2.0
     assert socket.getdefaulttimeout() == previous
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as later:
         assert later.gettimeout() == previous

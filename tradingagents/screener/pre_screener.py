@@ -6,14 +6,13 @@ K 线统一走 ``data_source`` 的境内多源链。筛选器不再向 Yahoo 询
 """
 
 import logging
-from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 def get_technical_indicators_batch(
-    stocks: List[Dict[str, str]],
-) -> List[Dict]:
+    stocks: list[dict[str, str]],
+) -> list[dict]:
     """
     批量获取股票技术指标（境内多源回退）。
 
@@ -50,12 +49,12 @@ def get_technical_indicators_batch(
 
 
 def pre_screen_stocks(
-    stocks: List[Dict[str, str]],
+    stocks: list[dict[str, str]],
     min_volume_ratio: float = 1.0,
     rsi_min: float = 40,
     rsi_max: float = 70,
     require_above_ma20: bool = True,
-) -> List[Dict]:
+) -> list[dict]:
     """
     预筛选股票（使用批量下载）。
 
@@ -86,7 +85,7 @@ def pre_screen_stocks(
 
         # 2. 股价在 20 日均线上方
         if require_above_ma20 and not tech["above_ma20"]:
-            reasons.append(f"股价低于 MA20")
+            reasons.append("股价低于 MA20")
 
         # 3. 成交量放大
         if tech["volume_ratio"] < min_volume_ratio:

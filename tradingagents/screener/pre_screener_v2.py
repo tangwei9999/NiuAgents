@@ -2,9 +2,9 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Dict, Optional, Set
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def _set_window_note(note: str) -> None:
     _last_window_note = note
 
 
-def _find_inflow_col(df) -> Optional[str]:
+def _find_inflow_col(df) -> str | None:
     """主力净流入净额列名（东财列名随接口变化，动态匹配）。"""
     for col in df.columns:
         if "主力净流入" in col and "净额" in col:
@@ -40,7 +40,7 @@ def _has_inflow_data(df, inflow_col) -> bool:
     return int(pd.to_numeric(df[inflow_col], errors="coerce").notna().sum()) > 0
 
 
-def _to_float(value) -> Optional[float]:
+def _to_float(value) -> float | None:
     """数值化，无效/缺失返回 None（东财盘前数值列为 NaN 或空串）。"""
     try:
         result = float(value)
@@ -59,7 +59,7 @@ def _today_flow_expected_generated() -> bool:
     return now.weekday() < 5 and now.strftime("%H:%M") >= "09:30"
 
 
-def _code_to_ticker(code) -> Optional[str]:
+def _code_to_ticker(code) -> str | None:
     """6 位代码转 Yahoo 风格 ticker；非沪深（北交所等）返回 None。"""
     code = str(code).zfill(6)
     if code.startswith("6"):
@@ -69,7 +69,7 @@ def _code_to_ticker(code) -> Optional[str]:
     return None
 
 
-def _market_of(code) -> Optional[str]:
+def _market_of(code) -> str | None:
     code = str(code).zfill(6)
     if code.startswith("6"):
         return "sh"
@@ -78,7 +78,7 @@ def _market_of(code) -> Optional[str]:
     return None
 
 
-def _latest_session_inflow(code: str) -> Optional[tuple]:
+def _latest_session_inflow(code: str) -> tuple | None:
     """(日期, 主力净流入) for a stock's latest completed session, or None.
 
     AKShare 的个股历史资金流表最后一行即为最近已完成交易日（盘前即昨日），
@@ -111,21 +111,21 @@ def _latest_session_inflow(code: str) -> Optional[tuple]:
 
 # 最近交易日资金流缓存：第 3 步精查后第 5 步直接复用，避免重复请求。
 # 查询失败的代码也缓存为 None，不会反复重试。
-_prev_day_flow_cache: Dict[str, Optional[tuple]] = {}
+_prev_day_flow_cache: dict[str, tuple | None] = {}
 
 
-def _ensure_prev_day_flow(codes: List[str]) -> Dict[str, tuple]:
+def _ensure_prev_day_flow(codes: list[str]) -> dict[str, tuple]:
     """并发补齐 codes 的最近交易日主力净流入，返回查得有效值的 {code: (日期, 值)}。"""
     missing = [c for c in codes if c not in _prev_day_flow_cache]
     if missing:
         logger.info(f"精查 {len(missing)} 只股票的最近交易日主力净流入…")
         with ThreadPoolExecutor(max_workers=_PRE_OPEN_WORKERS) as ex:
-            for code, hit in zip(missing, ex.map(_latest_session_inflow, missing)):
+            for code, hit in zip(missing, ex.map(_latest_session_inflow, missing), strict=False):
                 _prev_day_flow_cache[code] = hit
     return {c: _prev_day_flow_cache[c] for c in codes if _prev_day_flow_cache.get(c)}
 
 
-def get_hot_sectors(top_n: int = 10) -> Set[str]:
+def get_hot_sectors(top_n: int = 10) -> set[str]:
     """
     获取资金净流入最多的热门板块。
 
@@ -182,8 +182,8 @@ def get_sector_news_sentiment(sector: str, days: int = 7) -> float:
         情绪评分 (0-100)，越高越利好
     """
     try:
+
         import akshare as ak
-        from datetime import datetime, timedelta
 
         # 获取板块成分股
         df = ak.stock_board_industry_cons_em(symbol=sector)
@@ -204,9 +204,7 @@ def get_sector_news_sentiment(sector: str, days: int = 7) -> float:
                 if news_df.empty:
                     continue
 
-                # 过滤近 7 天的新闻
-                cutoff_date = datetime.now() - timedelta(days=days)
-                recent_news = news_df.head(20)  # 取最新 20 条
+                recent_news = news_df.head(20)  # 新闻接口返回按时间倒序，取最新 20 条
 
                 for _, row in recent_news.iterrows():
                     title = str(row.get("新闻标题", ""))
@@ -230,7 +228,7 @@ def get_sector_news_sentiment(sector: str, days: int = 7) -> float:
         return 0
 
 
-def get_positive_news_sectors(days: int = 7, min_score: float = 30, sector_top_n: int = 20) -> Dict[str, float]:
+def get_positive_news_sectors(days: int = 7, min_score: float = 30, sector_top_n: int = 20) -> dict[str, float]:
     """
     获取近 N 天有利好消息的板块（消息面筛选）。
 
@@ -261,7 +259,7 @@ def get_positive_news_sectors(days: int = 7, min_score: float = 30, sector_top_n
     return positive_sectors
 
 
-def filter_by_news_sector(stocks: List[Dict[str, str]], positive_sectors: Dict[str, float]) -> List[Dict]:
+def filter_by_news_sector(stocks: list[dict[str, str]], positive_sectors: dict[str, float]) -> list[dict]:
     """
     按利好板块筛选股票，并附带板块消息面评分。
 
@@ -280,7 +278,7 @@ def filter_by_news_sector(stocks: List[Dict[str, str]], positive_sectors: Dict[s
         return []
 
     # 1. 拉取每个利好板块的成分股，构建 代码 -> (板块, 评分) 映射
-    code_to_sector: Dict[str, tuple] = {}
+    code_to_sector: dict[str, tuple] = {}
     try:
         import akshare as ak
     except ImportError:
@@ -312,7 +310,7 @@ def filter_by_news_sector(stocks: List[Dict[str, str]], positive_sectors: Dict[s
     return filtered
 
 
-def get_fund_flow_rank() -> Optional[pd.DataFrame]:
+def get_fund_flow_rank() -> pd.DataFrame | None:
     """
     获取全市场个股资金流向排名。
 
@@ -336,11 +334,11 @@ def get_fund_flow_rank() -> Optional[pd.DataFrame]:
 
 # 全市场资金流排行在同一次选股过程中会被第 3 步和第 5 步各读一次，而单次请求
 # 要 30s+，因此按日缓存复用（跨天自动失效；接口失败不缓存，下次会重试）。
-_fund_flow_rank_cache: Optional[pd.DataFrame] = None
+_fund_flow_rank_cache: pd.DataFrame | None = None
 _fund_flow_rank_cached_date = ""
 
 
-def _get_fund_flow_rank_cached() -> Optional[pd.DataFrame]:
+def _get_fund_flow_rank_cached() -> pd.DataFrame | None:
     """当日内的全市场资金流排行副本（重复调用不重复请求）。"""
     global _fund_flow_rank_cache, _fund_flow_rank_cached_date
 
@@ -359,7 +357,7 @@ def _get_fund_flow_rank_cached() -> Optional[pd.DataFrame]:
 def get_stock_list_by_previous_day_flow(
     min_inflow: float = 0,
     max_stocks: int = 200,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """盘前/非交易时段的资金面筛选：以最近一个交易日的净流入为准。
 
     东财没有“按指定历史交易日批量取全市场个股资金流”的接口，因此分两步：
@@ -390,7 +388,7 @@ def get_stock_list_by_previous_day_flow(
     ).sort_values("_inflow", ascending=False)
     pool = pool[pool["_inflow"] > min_inflow].head(max_stocks * _PRE_OPEN_CANDIDATE_MULT)
 
-    names = dict(zip(pool["代码"].astype(str).str.zfill(6), pool["名称"]))
+    names = dict(zip(pool["代码"].astype(str).str.zfill(6), pool["名称"], strict=False))
     codes = list(names.keys())
     if not codes:
         logger.warning(f"{_PRE_OPEN_RANK_INDICATOR}排行无净流入个股，资金面筛选跳过")
@@ -423,7 +421,7 @@ def get_stock_list_by_previous_day_flow(
     return stocks
 
 
-def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) -> List[Dict[str, str]]:
+def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) -> list[dict[str, str]]:
     """
     从资金流向排名中获取股票列表。
 
@@ -473,7 +471,7 @@ def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) ->
     return stocks
 
 
-def _build_fund_flow_map(codes: List[str]) -> tuple:
+def _build_fund_flow_map(codes: list[str]) -> tuple:
     """code -> 主力净流入等字段，以及所用数据窗口标签。
 
     今日排行有数据时直接用（1 次调用覆盖全市场）；盘前今日数值全为 NaN 时改用
@@ -509,7 +507,7 @@ def _build_fund_flow_map(codes: List[str]) -> tuple:
     return mapping, (f"最近交易日 {session}" if session else "最近交易日")
 
 
-def get_stock_sector(ticker: str) -> Optional[str]:
+def get_stock_sector(ticker: str) -> str | None:
     """
     获取股票所属行业板块。
 
@@ -542,8 +540,8 @@ def get_stock_sector(ticker: str) -> Optional[str]:
 
 
 def pre_screen_stocks_multi_factor(
-    stocks: List[Dict[str, str]],
-    tech_data: List[Dict],
+    stocks: list[dict[str, str]],
+    tech_data: list[dict],
     min_main_force_inflow: float = 0,  # 主力净流入最小值（元）
     require_hot_sector: bool = True,
     hot_sector_top_n: int = 15,
@@ -553,7 +551,7 @@ def pre_screen_stocks_multi_factor(
     require_macd_golden_cross: bool = True,
     min_volume_ratio: float = 0.8,
     find_early_uptrend: bool = True,  # 找早期上升趋势
-) -> List[Dict]:
+) -> list[dict]:
     """
     多因子预筛选：技术面 + 资金面 + 板块热度 + 潜力识别。
 

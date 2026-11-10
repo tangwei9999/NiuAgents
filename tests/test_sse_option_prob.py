@@ -28,6 +28,10 @@ from tradingagents.dataflows.config import run_config
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.vendors import sse_option
 
+# These tests patch akshare attributes directly, which requires the real
+# library; CI installs none, so skip there instead of erroring on collection.
+pytest.importorskip("akshare")
+
 OUTCOMES = ((4.0, 0.5), (4.5, 0.3), (5.0, 0.2))
 STRIKES = [round(4.1 + 0.1 * i, 2) for i in range(10)]  # 4.1 ... 5.0
 
@@ -154,7 +158,7 @@ def test_odds_that_rise_with_the_strike_are_dropped_and_not_clipped():
     rows = sse_option._ladder(calls, {}, 1.0)
     probs = [prob for _, prob in rows]
     assert all(
-        a >= b - sse_option._ODDS_TOL for a, b in zip(probs, probs[1:])
+        a >= b - sse_option._ODDS_TOL for a, b in zip(probs, probs[1:], strict=False)
     ), rows
     assert [round(strike, 3) for strike, _ in rows] == [4.25, 4.75, 6.25], (
         "5.25 and 5.75 sit on a curve that turns up, so neither may be shown"
@@ -177,9 +181,8 @@ def test_a_board_call_that_fails_asks_the_router_to_move_on(boards):
     with mock.patch(
         "akshare.option_finance_board",
         side_effect=requests.ConnectTimeout("yunhq.sse.com.cn timed out"),
-    ):
-        with pytest.raises(VendorUnavailableError, match="期权板获取失败"):
-            sse_option.get_prediction_markets("沪深300 政策")
+    ), pytest.raises(VendorUnavailableError, match="期权板获取失败"):
+        sse_option.get_prediction_markets("沪深300 政策")
 
 
 @pytest.mark.unit
@@ -187,9 +190,11 @@ def test_a_month_the_exchange_does_not_list_is_no_coverage(boards):
     def unlisted(symbol: str, end_month: str):
         raise KeyError("list")
 
-    with mock.patch("akshare.option_finance_board", side_effect=unlisted):
-        with pytest.raises(NoMarketDataError, match="挂牌合约"):
-            sse_option.get_prediction_markets("沪深300 政策")
+    with (
+        mock.patch("akshare.option_finance_board", side_effect=unlisted),
+        pytest.raises(NoMarketDataError, match="挂牌合约"),
+    ):
+        sse_option.get_prediction_markets("沪深300 政策")
 
 
 @pytest.mark.unit

@@ -227,3 +227,4 @@ reports/
 # 开发期冒烟脚本（正式测试在 tests/），不入库
 tradingagents/screener/test_*.py
 .idea/
+.qoder/

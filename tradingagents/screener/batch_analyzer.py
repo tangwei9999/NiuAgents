@@ -1,18 +1,16 @@
 """批量分析引擎模块 - 复用 TradingAgentsGraph 进行批量股票分析。"""
 
 import logging
-from typing import List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
 
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskID
 from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from tradingagents.dataflows.symbols import safe_ticker_component
-from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 logger = logging.getLogger(__name__)
 console = Console()
@@ -22,10 +20,10 @@ def analyze_single_stock(
     ticker: str,
     name: str,
     analysis_date: str,
-    config: Dict,
-    report_dir: Optional[str] = None,
+    config: dict,
+    report_dir: str | None = None,
     html: bool = True,
-) -> Optional[Dict]:
+) -> dict | None:
     """
     分析单只股票。
 
@@ -91,13 +89,13 @@ def analyze_single_stock(
 
 
 def batch_analyze(
-    stocks: List[Dict],
-    analysis_date: Optional[str] = None,
+    stocks: list[dict],
+    analysis_date: str | None = None,
     max_workers: int = 3,
-    config: Optional[Dict] = None,
-    report_dir: Optional[str] = None,
+    config: dict | None = None,
+    report_dir: str | None = None,
     html: bool = True,
-) -> List[Dict]:
+) -> list[dict]:
     """
     批量分析股票。
 

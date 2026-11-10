@@ -19,7 +19,6 @@ import contextlib
 import io
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
 
 import pandas as pd
 
@@ -53,7 +52,7 @@ _MIN_ENTRY_GAP_PCT = 0.02
 _MIN_TARGET_GAP_PCT = 0.03
 
 
-def _to_numeric(df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
+def _to_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     for col in cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
@@ -147,7 +146,7 @@ _OHLC_SOURCES = (
 )
 
 
-def _fetch_ohlc(ticker: str) -> Optional[pd.DataFrame]:
+def _fetch_ohlc(ticker: str) -> pd.DataFrame | None:
     """First source that yields usable high/low/close bars, or None."""
     for label, fetcher in _OHLC_SOURCES:
         try:
@@ -166,7 +165,7 @@ def _fetch_ohlc(ticker: str) -> Optional[pd.DataFrame]:
     return None
 
 
-def get_price_levels(ticker: str, bars: int = _SWING_BARS) -> Optional[Dict[str, float]]:
+def get_price_levels(ticker: str, bars: int = _SWING_BARS) -> dict[str, float] | None:
     """Compute swing resistance/support plus entry/target prices for one ticker.
 
     Returns None when no source can supply at least 5 usable bars, so the
@@ -205,7 +204,7 @@ def get_price_levels(ticker: str, bars: int = _SWING_BARS) -> Optional[Dict[str,
     }
 
 
-def attach_price_levels(stocks: List[Dict]) -> List[Dict]:
+def attach_price_levels(stocks: list[dict]) -> list[dict]:
     """Fetch levels for each ranked stock and store them under ``price_levels``.
 
     Never raises: a data-source outage must not hide the ranking result, and a
@@ -221,7 +220,7 @@ def attach_price_levels(stocks: List[Dict]) -> List[Dict]:
     return stocks
 
 
-def format_level_line(stock: Dict) -> str:
+def format_level_line(stock: dict) -> str:
     """One stock per line, in the screener's requested output format."""
     code = stock.get("ticker", "").split(".")[0]
 

@@ -1,7 +1,6 @@
 """评分排序模块 - 综合多维度评分并排序股票。"""
 
 import logging
-from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,7 @@ def get_weights(config=None):
     }
 
 
-def calculate_technical_score(tech: Dict) -> float:
+def calculate_technical_score(tech: dict) -> float:
     """
     计算技术面得分（0-100）。
 
@@ -81,7 +80,7 @@ def calculate_technical_score(tech: Dict) -> float:
     return min(100, max(0, score))
 
 
-def calculate_volume_score(tech: Dict) -> float:
+def calculate_volume_score(tech: dict) -> float:
     """
     计算资金面得分（0-100）。
 
@@ -107,7 +106,7 @@ def calculate_volume_score(tech: Dict) -> float:
     return min(100, max(0, score))
 
 
-def calculate_momentum_score(tech: Dict) -> float:
+def calculate_momentum_score(tech: dict) -> float:
     """
     计算动量得分（0-100）。
 
@@ -142,7 +141,7 @@ def calculate_momentum_score(tech: Dict) -> float:
     return min(100, max(0, score))
 
 
-def score_stock(result: Dict, config=None) -> Dict:
+def score_stock(result: dict, config=None) -> dict:
     """
     综合评分单只股票。
 
@@ -190,7 +189,7 @@ def score_stock(result: Dict, config=None) -> Dict:
     }
 
 
-def rank_stocks(results: List[Dict], top_n: int = 3, config=None) -> List[Dict]:
+def rank_stocks(results: list[dict], top_n: int = 3, config=None) -> list[dict]:
     """
     对股票进行评分排序。
 
@@ -212,7 +211,7 @@ def rank_stocks(results: List[Dict], top_n: int = 3, config=None) -> List[Dict]:
     return scored[:top_n]
 
 
-def print_ranking(results: List[Dict]):
+def print_ranking(results: list[dict]):
     """
     打印排名结果。
 
@@ -228,7 +227,7 @@ def print_ranking(results: List[Dict]):
         print(f"\n{i}. {r['name']} ({r['ticker']})")
         print(f"   综合得分：{scores.get('total', 0):.1f}")
         print(f"   评级：{r['rating']}")
-        print(f"   细分得分：")
+        print("   细分得分：")
         print(f"     - LLM 评级：{scores.get('rating', 0):.1f}")
         print(f"     - 技术面：{scores.get('technical', 0):.1f}")
         print(f"     - 资金面：{scores.get('volume', 0):.1f}")

@@ -247,7 +247,7 @@ def _ladder(calls: dict, puts: dict, discount: float) -> list[tuple[float, float
     """
     rows: list[tuple[float, float]] = []
     strikes = sorted(calls)
-    for low, high in zip(strikes, strikes[1:]):
+    for low, high in zip(strikes, strikes[1:], strict=False):
         gap = high - low
         if gap <= 0:
             continue
