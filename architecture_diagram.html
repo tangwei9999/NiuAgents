@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents 系统架构图</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --green: #4ade80; --orange: #fb923c; --pink: #f472b6;
+    --purple: #a78bfa; --yellow: #fbbf24; --red: #f87171;
+    --teal: #2dd4bf; --indigo: #818cf8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.6; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 2.2rem; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .header p { color: var(--muted); font-size: 1rem; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  /* === Section Titles === */
+  .section-title { font-size: 1.4rem; color: var(--accent); margin: 40px 0 20px; padding-left: 16px; border-left: 4px solid var(--accent); }
+
+  /* === Layer Architecture === */
+  .layers { display: flex; flex-direction: column; gap: 2px; margin-bottom: 40px; }
+  .layer { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; position: relative; transition: transform .2s, box-shadow .2s; }
+  .layer:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+  .layer-label { position: absolute; top: -12px; left: 24px; background: var(--bg); padding: 0 12px; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+  .layer-content { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .layer-desc { color: var(--muted); font-size: .85rem; margin-bottom: 12px; }
+
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: .82rem; font-weight: 500; border: 1px solid; }
+  .chip-blue   { background: rgba(56,189,248,.12); border-color: rgba(56,189,248,.3); color: var(--accent); }
+  .chip-green  { background: rgba(74,222,128,.12); border-color: rgba(74,222,128,.3); color: var(--green); }
+  .chip-orange { background: rgba(251,146,60,.12); border-color: rgba(251,146,60,.3); color: var(--orange); }
+  .chip-pink   { background: rgba(244,114,182,.12); border-color: rgba(244,114,182,.3); color: var(--pink); }
+  .chip-purple { background: rgba(167,139,250,.12); border-color: rgba(167,139,250,.3); color: var(--purple); }
+  .chip-yellow { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.3); color: var(--yellow); }
+  .chip-teal   { background: rgba(45,212,191,.12); border-color: rgba(45,212,191,.3); color: var(--teal); }
+  .chip-red    { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.3); color: var(--red); }
+  .chip-indigo { background: rgba(129,140,248,.12); border-color: rgba(129,140,248,.3); color: var(--indigo); }
+
+  .arrow-down { text-align: center; color: var(--muted); font-size: 1.5rem; margin: -4px 0; opacity: .5; }
+
+  /* === Agent Flow Diagram === */
+  .flow-diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 30px; margin-bottom: 40px; overflow-x: auto; }
+  .flow-row { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .flow-row:last-child { margin-bottom: 0; }
+  .flow-node { padding: 12px 20px; border-radius: 10px; font-size: .85rem; font-weight: 600; text-align: center; min-width: 140px; position: relative; border: 2px solid; }
+  .flow-node.analyst { background: rgba(56,189,248,.1); border-color: var(--accent); color: var(--accent); }
+  .flow-node.researcher { background: rgba(74,222,128,.1); border-color: var(--green); color: var(--green); }
+  .flow-node.trader { background: rgba(251,146,60,.1); border-color: var(--orange); color: var(--orange); }
+  .flow-node.risk { background: rgba(244,114,182,.1); border-color: var(--pink); color: var(--pink); }
+  .flow-node.manager { background: rgba(167,139,250,.1); border-color: var(--purple); color: var(--purple); }
+  .flow-node.memory { background: rgba(45,212,191,.1); border-color: var(--teal); color: var(--teal); }
+  .flow-node.output { background: rgba(251,191,36,.1); border-color: var(--yellow); color: var(--yellow); }
+  .flow-node small { display: block; font-weight: 400; font-size: .72rem; opacity: .7; margin-top: 2px; }
+  .flow-arrow { color: var(--muted); font-size: 1.2rem; }
+  .flow-arrow-down { text-align: center; color: var(--muted); font-size: 1.3rem; margin: 4px 0; }
+  .flow-parallel { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .flow-bracket { border: 2px dashed var(--muted); border-radius: 12px; padding: 16px; opacity: .3; position: relative; }
+  .flow-bracket-label { position: absolute; top: -10px; left: 16px; background: var(--surface); padding: 0 8px; font-size: .7rem; color: var(--muted); }
+
+  /* === Data Vendor Map === */
+  .vendor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 40px; }
+  .vendor-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; transition: border-color .2s; }
+  .vendor-card:hover { border-color: var(--accent); }
+  .vendor-card h3 { font-size: .95rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .vendor-card .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .vendor-card ul { list-style: none; padding: 0; }
+  .vendor-card li { font-size: .82rem; color: var(--muted); padding: 3px 0; padding-left: 16px; position: relative; }
+  .vendor-card li::before { content: '›'; position: absolute; left: 0; color: var(--accent); font-weight: bold; }
+
+  /* === LLM Tier === */
+  .tier-box { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+  .tier-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .tier-card h3 { font-size: 1rem; margin-bottom: 12px; }
+  .tier-card .tier-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .7rem; font-weight: 700; margin-bottom: 12px; }
+  .tier-quick .tier-tag { background: rgba(56,189,248,.2); color: var(--accent); }
+  .tier-deep .tier-tag { background: rgba(167,139,250,.2); color: var(--purple); }
+  .tier-card .roles { font-size: .82rem; color: var(--muted); }
+  .tier-card .roles span { display: inline-block; background: rgba(255,255,255,.05); padding: 2px 8px; border-radius: 6px; margin: 2px; font-size: .78rem; }
+
+  /* === State Model === */
+  .state-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; font-size: .85rem; }
+  .state-table th { text-align: left; padding: 10px 14px; background: rgba(56,189,248,.08); color: var(--accent); border-bottom: 2px solid var(--border); font-weight: 600; }
+  .state-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .state-table tr:hover td { background: rgba(255,255,255,.02); }
+  .state-table code { background: rgba(56,189,248,.1); padding: 1px 6px; border-radius: 4px; font-size: .82rem; color: var(--accent); }
+
+  /* === Config Chain === */
+  .config-chain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 40px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .config-step { padding: 10px 18px; border-radius: 8px; font-size: .82rem; font-weight: 600; border: 1px solid; }
+  .config-arrow { color: var(--muted); font-size: 1.1rem; }
+
+  /* === Footer === */
+  .footer { text-align: center; padding: 40px 20px; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--border); margin-top: 40px; }
+
+  @media (max-width: 768px) {
+    .tier-box { grid-template-columns: 1fr; }
+    .flow-node { min-width: 110px; font-size: .78rem; }
+    .header h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TradingAgents v0.7.1 — 系统架构图</h1>
+  <p>Multi-Agents LLM Financial Trading Framework · 基于 LangGraph 的多智能体交易决策框架</p>
+</div>
+
+<div class="container">
+
+<!-- ===================== 分层架构 ===================== -->
+<h2 class="section-title">一、系统分层架构</h2>
+
+<div class="layers">
+  <!-- Layer 1: Entry -->
+  <div class="layer" style="border-color: rgba(251,191,36,.3);">
+    <span class="layer-label" style="color: var(--yellow);">入口层 · Entry</span>
+    <p class="layer-desc">用户交互入口，支持 CLI 交互、脚本调用与内置选股器</p>
+    <div class="layer-content">
+      <span class="chip chip-yellow">cli/main.py · Typer CLI</span>
+      <span class="chip chip-yellow">main.py · 脚本入口</span>
+      <span class="chip chip-yellow">Docker · 容器化部署</span>
+      <span class="chip chip-green" style="border-color: rgba(74,222,128,.5);">screener · 内置选股器 ⭐</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 2: Config -->
+  <div class="layer" style="border-color: rgba(45,212,191,.3);">
+    <span class="layer-label" style="color: var(--teal);">配置层 · Config</span>
+    <p class="layer-desc">三级配置加载链：硬编码默认值 → 环境变量覆盖 → 运行时参数</p>
+    <div class="layer-content">
+      <span class="chip chip-teal">default_config.py</span>
+      <span class="chip chip-teal">.env / .env.enterprise</span>
+      <span class="chip chip-teal">TRADINGAGENTS_* 环境变量</span>
+      <span class="chip chip-teal">cli/prefs.py 偏好持久化</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 3: Orchestration -->
+  <div class="layer" style="border-color: rgba(56,189,248,.3);">
+    <span class="layer-label" style="color: var(--accent);">编排层 · Orchestration</span>
+    <p class="layer-desc">LangGraph 状态图编排：节点注册、条件路由、检查点恢复、流式执行</p>
+    <div class="layer-content">
+      <span class="chip chip-blue">graph/trading_graph.py · 主编排器</span>
+      <span class="chip chip-blue">graph/setup.py · 图构建</span>
+      <span class="chip chip-blue">graph/propagation.py · 状态传播</span>
+      <span class="chip chip-blue">graph/conditional_logic.py · 条件路由</span>
+      <span class="chip chip-blue">graph/checkpointer.py · SQLite 检查点</span>
+      <span class="chip chip-blue">graph/analyst_execution.py · 并行调度</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 4: Agent -->
+  <div class="layer" style="border-color: rgba(74,222,128,.3);">
+    <span class="layer-label" style="color: var(--green);">智能体层 · Agents</span>
+    <p class="layer-desc">四类角色 × 11 个 LLM 智能体，模拟真实交易公司的决策链路</p>
+    <div class="layer-content">
+      <span class="chip chip-green">analysts/ · 4 位分析师</span>
+      <span class="chip chip-green">researchers/ · 多空研究员</span>
+      <span class="chip chip-green">trader/ · 交易员</span>
+      <span class="chip chip-green">risk_mgmt/ · 3 位风控辩论员</span>
+      <span class="chip chip-green">managers/ · 研究经理 + 组合经理</span>
+      <span class="chip chip-green">tools.py · 数据工具集</span>
+      <span class="chip chip-green">rating.py · 5 级评级</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 5: LLM Client -->
+  <div class="layer" style="border-color: rgba(167,139,250,.3);">
+    <span class="layer-label" style="color: var(--purple);">LLM 适配层 · Client</span>
+    <p class="layer-desc">20+ 大语言模型提供商统一适配，双 tier 独立配置</p>
+    <div class="layer-content">
+      <span class="chip chip-purple">factory.py · 客户端工厂</span>
+      <span class="chip chip-purple">openai_client.py</span>
+      <span class="chip chip-purple">anthropic_client.py</span>
+      <span class="chip chip-purple">google_client.py</span>
+      <span class="chip chip-purple">azure_client.py</span>
+      <span class="chip chip-purple">bedrock_client.py</span>
+      <span class="chip chip-purple">model_catalog.py · 模型目录</span>
+      <span class="chip chip-purple">capabilities.py · 能力检测</span>
+      <span class="chip chip-purple">chatgpt_auth.py · 订阅认证</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 6: Data -->
+  <div class="layer" style="border-color: rgba(251,146,60,.3);">
+    <span class="layer-label" style="color: var(--orange);">数据层 · Dataflows</span>
+    <p class="layer-desc">多源数据接入，供应商路由 + fallback 链 + point-in-time 日期窗口防护 + 国内数据源</p>
+    <div class="layer-content">
+      <span class="chip chip-orange">router.py · 供应商路由</span>
+      <span class="chip chip-green" style="border-color: rgba(74,222,128,.5);">baostock · 免费无限流 ⭐</span>
+      <span class="chip chip-green" style="border-color: rgba(74,222,128,.5);">akshare · 腾讯/新浪/东方财富 ⭐</span>
+      <span class="chip chip-orange">yahoo/ · 行情/新闻/基本面</span>
+      <span class="chip chip-orange">alpha_vantage/ · 备选行情</span>
+      <span class="chip chip-orange">sec_edgar.py · SEC 财报</span>
+      <span class="chip chip-orange">fred.py · 宏观经济</span>
+      <span class="chip chip-orange">polymarket.py · 预测市场</span>
+      <span class="chip chip-orange">reddit.py / stocktwits.py · 社交情绪</span>
+      <span class="chip chip-orange">date_window.py · 日期窗口</span>
+    </div>
+  </div>
+
+  <div class="arrow-down">▼</div>
+
+  <!-- Layer 7: Memory -->
+  <div class="layer" style="border-color: rgba(244,114,182,.3);">
+    <span class="layer-label" style="color: var(--pink);">记忆层 · Memory</span>
+    <p class="layer-desc">决策日志持久化 → 自动结算 → LLM 反思 → 经验注入后续运行</p>
+    <div class="layer-content">
+      <span class="chip chip-pink">log.py · TradingMemoryLog</span>
+      <span class="chip chip-pink">settlement.py · 结算引擎</span>
+      <span class="chip chip-pink">reflection.py · 反思生成</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Agent Flow ===================== -->
+<h2 class="section-title">二、智能体协作流程</h2>
+
+<div class="flow-diagram">
+  <p style="text-align:center; color:var(--muted); margin-bottom:20px; font-size:.9rem;">
+    START → 分析师并行 → 研究辩论 → 交易决策 → 风控辩论 → 组合审批 → END
+  </p>
+
+  <!-- Step 1: Parallel Analysts -->
+  <div class="flow-row">
+    <div class="flow-parallel">
+      <div class="flow-node analyst">Market Analyst<small>技术面 · OHLCV · 指标</small></div>
+      <div class="flow-node analyst">Sentiment Analyst<small>社交情绪 · Reddit · StockTwits</small></div>
+      <div class="flow-node analyst">News Analyst<small>公司新闻 · 宏观新闻</small></div>
+      <div class="flow-node analyst">Fundamentals Analyst<small>财报 · 资产负债表</small></div>
+      <div class="flow-node memory" style="border-style:dashed;">Memory Log<small>结算历史 · 注入教训</small></div>
+    </div>
+  </div>
+  <div class="flow-arrow-down">▼ 全部报告就绪后 ▼</div>
+
+  <!-- Step 2: Research Debate -->
+  <div class="flow-row">
+    <div class="flow-node researcher">Bull Researcher<small>看多论点</small></div>
+    <div class="flow-arrow">⇄</div>
+    <div class="flow-node researcher">Bear Researcher<small>看空论点</small></div>
+  </div>
+  <div class="flow-arrow-down">▼ max_debate_rounds 轮辩论 ▼</div>
+  <div class="flow-row">
+    <div class="flow-node manager">Research Manager<small>综合研判 · 投资建议</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <!-- Step 3: Trader -->
+  <div class="flow-row">
+    <div class="flow-node trader">Trader<small>交易提案 · 时机与仓位</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <!-- Step 4: Risk Debate -->
+  <div class="flow-row">
+    <div class="flow-node risk">Aggressive Analyst<small>激进派风控</small></div>
+    <div class="flow-arrow">⇄</div>
+    <div class="flow-node risk">Conservative Analyst<small>保守派风控</small></div>
+    <div class="flow-arrow">⇄</div>
+    <div class="flow-node risk">Neutral Analyst<small>中立派风控</small></div>
+  </div>
+  <div class="flow-arrow-down">▼ max_risk_discuss_rounds 轮辩论 ▼</div>
+
+  <!-- Step 5: Portfolio Manager -->
+  <div class="flow-row">
+    <div class="flow-node manager" style="min-width:240px;">Portfolio Manager<small>最终审批 · 5 级评级输出</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <!-- Step 6: Output -->
+  <div class="flow-row">
+    <div class="flow-node output">Buy / Overweight / Hold / Underweight / Sell<small>5-tier Rating Output</small></div>
+  </div>
+</div>
+
+<!-- ===================== LLM Tier ===================== -->
+<h2 class="section-title">三、LLM 双 Tier 架构</h2>
+
+<div class="tier-box">
+  <div class="tier-card tier-quick">
+    <span class="tier-tag">Quick Think Tier</span>
+    <h3>快速思考层</h3>
+    <p class="roles">
+      <span>Market Analyst</span>
+      <span>Sentiment Analyst</span>
+      <span>News Analyst</span>
+      <span>Fundamentals Analyst</span>
+      <span>Bull Researcher</span>
+      <span>Bear Researcher</span>
+      <span>Trader</span>
+      <span>Aggressive Analyst</span>
+      <span>Conservative Analyst</span>
+      <span>Neutral Analyst</span>
+    </p>
+    <p style="margin-top:12px; font-size:.82rem; color:var(--muted);">
+      默认模型：<code style="color:var(--accent);">gpt-6-luna</code><br>
+      可独立配置 provider / model / endpoint
+    </p>
+  </div>
+  <div class="tier-card tier-deep">
+    <span class="tier-tag">Deep Think Tier</span>
+    <h3>深度思考层</h3>
+    <p class="roles">
+      <span>Research Manager</span>
+      <span>Portfolio Manager</span>
+      <span>Reflector（反思生成）</span>
+    </p>
+    <p style="margin-top:12px; font-size:.82rem; color:var(--muted);">
+      默认模型：<code style="color:var(--purple);">gpt-6-sol</code><br>
+      可独立配置 provider / model / endpoint<br>
+      负责需要深度推理的决策节点
+    </p>
+  </div>
+</div>
+
+<!-- ===================== Data Vendor ===================== -->
+<h2 class="section-title">四、数据供应商路由</h2>
+
+<div class="vendor-grid">
+  <div class="vendor-card" style="border-color: rgba(74,222,128,.4);">
+    <h3><span class="dot" style="background:var(--green);"></span>国内数据源 · 四大境内源 ⭐</h3>
+    <ul>
+      <li><strong>BaoStock</strong> — 免费无限流，专为 A 股设计，最稳定</li>
+      <li><strong>AKShare 腾讯</strong> — stock_zh_a_hist_tx，限流少</li>
+      <li><strong>AKShare 新浪</strong> — stock_zh_a_daily，较稳定</li>
+      <li><strong>AKShare 东方财富</strong> — stock_zh_a_hist，数据最全但易限流</li>
+      <li>技术指标计算（RSI/MACD/均线）</li>
+      <li><strong>四源自动回退</strong>，全部落空记为无数据（不访 Yahoo）</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--accent);"></span>核心行情 · core_stock_apis</h3>
+    <ul>
+      <li>akshare — A 股优先（东财/腾讯/新浪）</li>
+      <li>yfinance — Yahoo Finance OHLCV（美股/海外）</li>
+      <li>默认链：akshare,yfinance</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--green);"></span>技术指标 · technical_indicators</h3>
+    <ul>
+      <li>akshare — A 股指标优先；yfinance 覆盖美股</li>
+      <li>默认链：akshare,yfinance</li>
+      <li>get_verified_market_snapshot 验证快照</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--orange);"></span>基本面 · fundamental_data</h3>
+    <ul>
+      <li>sec_edgar — SEC 财报（按 filed date，point-in-time）</li>
+      <li>akshare — A 股财报</li>
+      <li>yfinance — 资产负债表 / 现金流 / 利润表（美股）</li>
+      <li>alpha_vantage — 综合基本面数据</li>
+      <li>默认链：sec_edgar,akshare,yfinance</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--pink);"></span>新闻数据 · news_data</h3>
+    <ul>
+      <li>akshare — A 股新闻优先</li>
+      <li>yfinance — 公司新闻 + 全球宏观新闻（美股）</li>
+      <li>默认链：akshare,yfinance</li>
+      <li>insider_transactions — 内部人交易</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--purple);"></span>宏观经济 · macro_data</h3>
+    <ul>
+      <li>FRED — 美联储经济数据</li>
+      <li>CPI / PCE / 失业率 / 联邦基金利率</li>
+      <li>欧元区指标镜像系列</li>
+      <li>可选分类：失败不中断运行</li>
+      <li>A 股批量分析默认 "none"：零请求，不付连接超时</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--yellow);"></span>预测市场 · prediction_markets</h3>
+    <ul>
+      <li>Polymarket — 市场隐含概率（美股叙事事件）</li>
+      <li>sse_option — 上交所期权隐含概率（A 股批量分析默认）</li>
+      <li>可选分类：失败降级为哨兵，不中断运行</li>
+      <li>A 股批量分析配 "sse_option"；配 "none" 则零请求跳过</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--teal);"></span>社交情绪 · (内置于 Sentiment Analyst)</h3>
+    <ul>
+      <li>Reddit — 投资社区讨论</li>
+      <li>StockTwits — 交易者情绪</li>
+      <li>Jev 筛选（可选）— TypeSafe 过滤无关帖子</li>
+      <li>A 股（.SS/.SZ）全部跳过：两个源均不收录</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--red);"></span>路由机制 · router.py</h3>
+    <ul>
+      <li>route_to_vendor() — 按配置链路由</li>
+      <li>tool_vendors 优先于 data_vendors</li>
+      <li>不静默跳转到未配置的供应商</li>
+      <li>NO_DATA_AVAILABLE / DATA_UNAVAILABLE 哨兵</li>
+      <li>可选类别配 "none" → 立即返回哨兵，不发请求</li>
+      <li>分段超时（连接 3s）+ 连不上的主机 10 分钟内不再请求</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===================== State Model ===================== -->
+<h2 class="section-title">五、核心状态模型（AgentState）</h2>
+
+<table class="state-table">
+  <thead>
+    <tr><th>字段</th><th>类型</th><th>语义</th><th>写入时机</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>company_of_interest</code></td><td>str</td><td>分析标的 ticker</td><td>运行启动</td></tr>
+    <tr><td><code>instrument_context</code></td><td>str</td><td>确定性公司信息（防幻觉）</td><td>运行启动</td></tr>
+    <tr><td><code>trade_date</code></td><td>str</td><td>分析日期（数据截止日）</td><td>运行启动</td></tr>
+    <tr><td><code>market_report</code></td><td>str</td><td>技术分析师报告</td><td>分析师阶段</td></tr>
+    <tr><td><code>sentiment_report</code></td><td>str</td><td>情绪分析师报告</td><td>分析师阶段</td></tr>
+    <tr><td><code>news_report</code></td><td>str</td><td>新闻分析师报告</td><td>分析师阶段</td></tr>
+    <tr><td><code>fundamentals_report</code></td><td>str</td><td>基本面分析师报告</td><td>分析师阶段</td></tr>
+    <tr><td><code>investment_debate_state</code></td><td>InvestDebateState</td><td>多空辩论状态（bull/bear/history/count）</td><td>研究阶段</td></tr>
+    <tr><td><code>investment_plan</code></td><td>str</td><td>研究经理综合建议</td><td>研究阶段</td></tr>
+    <tr><td><code>trader_investment_plan</code></td><td>str</td><td>交易员交易提案</td><td>交易阶段</td></tr>
+    <tr><td><code>risk_debate_state</code></td><td>RiskDebateState</td><td>风控三方辩论状态</td><td>风控阶段</td></tr>
+    <tr><td><code>final_trade_decision</code></td><td>str</td><td>组合经理最终决策</td><td>审批阶段</td></tr>
+    <tr><td><code>final_rating</code></td><td>str</td><td>5 级评级 / REVIEW</td><td>审批阶段</td></tr>
+    <tr><td><code>past_context</code></td><td>str</td><td>历史决策教训（point-in-time）</td><td>Memory Log 步骤</td></tr>
+    <tr><td><code>portfolio_context</code></td><td>str</td><td>调用方持仓信息</td><td>运行启动</td></tr>
+  </tbody>
+</table>
+
+<!-- ===================== Config Chain ===================== -->
+<h2 class="section-title">六、配置加载链路</h2>
+
+<div class="config-chain">
+  <div class="config-step" style="background:rgba(45,212,191,.1); border-color:var(--teal); color:var(--teal);">
+    .env 文件<br><small>TRADINGAGENTS_*</small>
+  </div>
+  <span class="config-arrow">→</span>
+  <div class="config-step" style="background:rgba(56,189,248,.1); border-color:var(--accent); color:var(--accent);">
+    _ENV_OVERRIDES<br><small>自动类型转换</small>
+  </div>
+  <span class="config-arrow">→</span>
+  <div class="config-step" style="background:rgba(74,222,128,.1); border-color:var(--green); color:var(--green);">
+    DEFAULT_CONFIG<br><small>build_default_config()</small>
+  </div>
+  <span class="config-arrow">→</span>
+  <div class="config-step" style="background:rgba(251,146,60,.1); border-color:var(--orange); color:var(--orange);">
+    config.copy()<br><small>运行时覆盖</small>
+  </div>
+  <span class="config-arrow">→</span>
+  <div class="config-step" style="background:rgba(167,139,250,.1); border-color:var(--purple); color:var(--purple);">
+    TradingAgentsGraph<br><small>初始化编排器</small>
+  </div>
+  <span class="config-arrow">→</span>
+  <div class="config-step" style="background:rgba(251,191,36,.1); border-color:var(--yellow); color:var(--yellow);">
+    propagate()<br><small>执行分析</small>
+  </div>
+</div>
+
+<!-- ===================== Key Design ===================== -->
+<h2 class="section-title">七、关键设计决策</h2>
+
+<div class="vendor-grid">
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--green);"></span>Point-in-Time 防护</h3>
+    <ul>
+      <li>date_window.py 确保历史运行不读取未来数据</li>
+      <li>SEC EDGAR 按 filed date 提供财报</li>
+      <li>记忆日志按 resolved date 过滤教训</li>
+      <li>回测评分只使用分析日之后的价格</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--purple);"></span>检查点恢复</h3>
+    <ul>
+      <li>SQLite 持久化每个节点状态</li>
+      <li>签名机制保证配置变更时重建</li>
+      <li>crash 后从最后成功节点恢复</li>
+      <li>成功后自动清除检查点</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--orange);"></span>记忆隔离</h3>
+    <ul>
+      <li>实盘运行 → ~/.tradingagents/memory/</li>
+      <li>回测运行 → results_dir/backtest/ 独立日志</li>
+      <li>回测不污染实盘记忆</li>
+      <li>跨 ticker 经验教训自动分享</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--pink);"></span>全球市场支持</h3>
+    <ul>
+      <li>ticker 后缀自动识别区域（.HK / .T / .SS ...）</li>
+      <li>benchmark_map 自动匹配区域基准指数</li>
+      <li>支持股票 + 加密货币两种资产模式</li>
+      <li>多时区日期对齐处理</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===================== Screener Architecture ===================== -->
+<h2 class="section-title">八、A 股选股器架构 ⭐</h2>
+
+<div class="flow-diagram">
+  <p style="text-align:center; color:var(--muted); margin-bottom:20px; font-size:.9rem;">
+    <strong style="color:var(--green);">五步筛选漏斗：</strong>股票池 → 基础过滤 → 资金面 → 消息面 → 技术面 → 交互确认 → 深度分析 Top 3
+  </p>
+
+  <div class="flow-row">
+    <div class="flow-node analyst">第 1 步：股票池<br><small>AKShare 全 A 股 ~5200 只</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node researcher">第 2 步：基础过滤<br><small>剔除 ST/科创板/北交所，只留主板/中小/创业板</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node manager">第 3 步：资金面预筛选<br><small>主力净流入>0 → 取前 100 只（盘前自动用最近交易日）</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node output">第 4 步：消息面筛选<br><small>资金流入前 20 板块中近 7 天有利好的板块</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node trader">第 5 步：技术面筛选<br><small>RSI 30-65 · 股价>MA20 · MACD 金叉 · 量比≥0.8</small></div>
+  </div>
+  <div class="flow-arrow-down">▼ 潜力评分（满分 100）排序</div>
+
+  <div class="flow-row">
+    <div class="flow-node researcher" style="min-width:200px;">几十只潜力股<br><small>按潜力评分降序排序</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node yellow">❓ 交互确认<br><small>打印潜力股列表<br>询问是否继续深度分析？</small></div>
+  </div>
+  <div class="flow-arrow-down">▼ 选择「是」继续 / 选择「否」结束</div>
+
+  <div class="flow-row">
+    <div class="flow-node manager" style="min-width:200px;">第 6 步：多智能体深度分析<br><small>TradingAgents 分析引擎（每只 3-5 分钟）</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node trader">第 7 步：综合评分排序<br><small>LLM 40% + 技术 30% + 资金 20% + 动量 10%</small></div>
+  </div>
+  <div class="flow-arrow-down">▼</div>
+
+  <div class="flow-row">
+    <div class="flow-node output" style="min-width:200px; border-style:dashed;">🏆 最终推荐 Top 3 + 交易点位<br><small>股票代码/名称/上涨潜力分数<br>阻力位/支撑位/建议买卖价<br>每只完整报告树落盘（分节 md + complete_report.html）</small></div>
+  </div>
+</div>
+
+<div class="vendor-grid">
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--green);"></span>选股器模块结构</h3>
+    <ul>
+      <li>screener/data_source.py — 多源数据适配器</li>
+      <li>screener/stock_universe.py — 股票池获取</li>
+      <li>screener/pre_screener_v2.py — 多因子预筛选 ⭐</li>
+      <li>screener/batch_analyzer.py — 批量分析引擎</li>
+      <li>screener/scorer.py — 综合评分排序</li>
+      <li>screener/price_levels.py — 交易点位（阻力/支撑/建议买卖价）</li>
+      <li>screener/a_stock_screener.py — A 股主脚本 ⭐</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--accent);"></span>五步筛选漏斗</h3>
+    <ul>
+      <li>第 1 步：股票池 - AKShare 全 A 股 ~5200 只</li>
+      <li>第 2 步：基础过滤 - 剔除 ST/科创板/北交所</li>
+      <li>第 3 步：资金面 - 主力净流入>0 取前 100（盘前降级为最近一个交易日）</li>
+      <li>第 4 步：消息面 - 近一周利好板块</li>
+      <li>第 5 步：技术面 - RSI 30-65/MA20/MACD/量比</li>
+      <li>⭐ 潜力评分：满分 100，按分降序排序</li>
+    </ul>
+  </div>
+  <div class="vendor-card">
+    <h3><span class="dot" style="background:var(--purple);"></span>CLI 集成</h3>
+    <ul>
+      <li>.\.venv\Scripts\activate.bat 激活虚拟环境</li>
+      <li>tradingagents screener --top 3 --workers 1</li>
+      <li>--date YYYY-MM-DD 指定分析日期</li>
+      <li>--save/--no-save 控制报告保存（--html 附带完整报告 HTML，默认开）</li>
+      <li>--max-candidates N 深度分析上限（默认 50，按潜力评分截断）</li>
+      <li>--yes 跳过交互确认（无人值守）</li>
+    </ul>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  TradingAgents v0.7.1 · Architecture Diagram · Generated 2026-11-09<br>
+  <a href="https://github.com/TauricResearch/TradingAgents" style="color:var(--accent);">GitHub Repository</a>
+  · <a href="https://arxiv.org/abs/2412.20138" style="color:var(--accent);">arXiv: 2412.20138</a><br>
+  <small style="color:var(--green);">⭐ 新增：内置选股器支持四维筛选（技术面+资金面+板块热度+消息面）+ 交互确认 + 深度分析，覆盖全 A 股 5000+ 只股票</small>
+</div>
+
+</body>
+</html>

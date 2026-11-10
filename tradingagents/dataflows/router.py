@@ -17,6 +17,17 @@ from tradingagents.dataflows.vendors.alpha_vantage import (
     get_news as get_alpha_vantage_news,
     get_stock as get_alpha_vantage_stock,
 )
+from tradingagents.dataflows.vendors.akshare import (
+    get_balance_sheet as get_akshare_balance_sheet,
+    get_cashflow as get_akshare_cashflow,
+    get_fundamentals as get_akshare_fundamentals,
+    get_global_news as get_akshare_global_news,
+    get_income_statement as get_akshare_income_statement,
+    get_indicators as get_akshare_indicators,
+    get_insider_transactions as get_akshare_insider_transactions,
+    get_news as get_akshare_news,
+    get_stock_data as get_akshare_stock_data,
+)
 from tradingagents.dataflows.vendors.fred import get_macro_data as get_fred_macro_data
 from tradingagents.dataflows.vendors.polymarket import (
     get_prediction_markets as get_polymarket_prediction_markets,
@@ -25,6 +36,9 @@ from tradingagents.dataflows.vendors.sec_edgar import (
     get_balance_sheet as get_sec_edgar_balance_sheet,
     get_cashflow as get_sec_edgar_cashflow,
     get_income_statement as get_sec_edgar_income_statement,
+)
+from tradingagents.dataflows.vendors.sse_option import (
+    get_prediction_markets as get_sse_option_prediction_markets,
 )
 from tradingagents.dataflows.vendors.yahoo.fundamentals import (
     get_balance_sheet as get_yfinance_balance_sheet,
@@ -93,48 +107,65 @@ TOOLS_CATEGORIES = {
 # categories (prices, fundamentals, news) still raise so a broken primary is loud.
 OPTIONAL_CATEGORIES = {"macro_data", "prediction_markets"}
 
+# Tokens that switch a category off outright. An offshore enrichment source a
+# network cannot reach costs a connect timeout and a warning on every call even
+# though it can never answer; configuring "none" makes its tools return the
+# unavailable sentinel immediately, with no request made.
+DISABLED_VENDOR_TOKENS = {"none", "off", "disabled", "skip"}
+
 # Mapping of methods to their vendor-specific implementations
 VENDOR_METHODS = {
     # core_stock_apis
     "get_stock_data": {
+        "akshare": get_akshare_stock_data,
         "alpha_vantage": get_alpha_vantage_stock,
         "yfinance": get_YFin_data_online,
     },
     # technical_indicators
     "get_indicators": {
+        "akshare": get_akshare_indicators,
         "alpha_vantage": get_alpha_vantage_indicator,
         "yfinance": get_stock_stats_indicators_window,
     },
     # fundamental_data
     "get_fundamentals": {
+        "akshare": get_akshare_fundamentals,
         "alpha_vantage": get_alpha_vantage_fundamentals,
         "yfinance": get_yfinance_fundamentals,
     },
     "get_balance_sheet": {
+        "akshare": get_akshare_balance_sheet,
         "alpha_vantage": get_alpha_vantage_balance_sheet,
         "sec_edgar": get_sec_edgar_balance_sheet,
         "yfinance": get_yfinance_balance_sheet,
     },
     "get_cashflow": {
+        "akshare": get_akshare_cashflow,
         "alpha_vantage": get_alpha_vantage_cashflow,
         "sec_edgar": get_sec_edgar_cashflow,
         "yfinance": get_yfinance_cashflow,
     },
     "get_income_statement": {
+        "akshare": get_akshare_income_statement,
         "alpha_vantage": get_alpha_vantage_income_statement,
         "sec_edgar": get_sec_edgar_income_statement,
         "yfinance": get_yfinance_income_statement,
     },
     # news_data
     "get_news": {
+        "akshare": get_akshare_news,
         "alpha_vantage": get_alpha_vantage_news,
         "yfinance": get_news_yfinance,
     },
     "get_global_news": {
+        "akshare": get_akshare_global_news,
         "yfinance": get_global_news_yfinance,
         "alpha_vantage": get_alpha_vantage_global_news,
     },
     "get_insider_transactions": {
+        # Declines with a coverage error rather than data: registered so a chain
+        # of AKShare alone answers the tool instead of dying in the router.
+        "akshare": get_akshare_insider_transactions,
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
     },
@@ -145,6 +176,10 @@ VENDOR_METHODS = {
     # prediction_markets
     "get_prediction_markets": {
         "polymarket": get_polymarket_prediction_markets,
+        # China has no event market, so this answers the same shape of question
+        # -- a priced forward-looking probability -- off the SSE index option
+        # chain, on a host a China network reaches in about 0.1s.
+        "sse_option": get_sse_option_prediction_markets,
     },
 }
 
@@ -202,6 +237,25 @@ def route_to_vendor(method: str, *args, **kwargs):
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
     primary_vendors = [v.strip() for v in vendor_config.split(',')]
+
+    # "none" is a choice, not a misconfiguration: it applies to the optional
+    # enrichment categories only, whose whole purpose is to be liftable. A core
+    # category would strip data a decision rests on, so that stays an error.
+    # Empty entries mean "not configured" (use the available vendors), so the
+    # check needs at least one real token to speak from.
+    named = [v for v in primary_vendors if v]
+    if named and all(v.lower() in DISABLED_VENDOR_TOKENS for v in named):
+        if category not in OPTIONAL_CATEGORIES:
+            raise ValueError(
+                f"Category '{category}' is core and cannot be disabled; "
+                f"configure a vendor for it instead."
+            )
+        logger.info("Optional %s disabled by configuration; skipping %s", category, method)
+        return (
+            f"DATA_UNAVAILABLE: {category} is disabled in this configuration "
+            f"(data_vendors=\"{vendor_config}\"). Proceed without it; do not "
+            f"retry this tool and do not fabricate values."
+        )
 
     if method not in VENDOR_METHODS:
         raise ValueError(f"Method '{method}' not supported")

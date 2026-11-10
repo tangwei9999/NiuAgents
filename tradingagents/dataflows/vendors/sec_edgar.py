@@ -31,11 +31,23 @@ from tradingagents import __version__
 from tradingagents.dataflows.config import get_config
 from tradingagents.dataflows.errors import NoMarketDataError, VendorUnavailableError
 from tradingagents.dataflows.files import replace_file
+from tradingagents.dataflows.net import (
+    CONNECT_TIMEOUT,
+    block_host,
+    blocked_notice,
+    clear_host_block,
+    is_connect_level_failure,
+    is_host_blocked,
+)
 
 logger = logging.getLogger(__name__)
 
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 _FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+
+# EDGAR serves multi-megabyte XBRL fact files, so the read budget stays patient
+# while a host this network cannot reach fails fast and gets parked for the run.
+_REQUEST_TIMEOUT = (CONNECT_TIMEOUT, 20.0)
 
 # A filing history only changes when something new is filed, so one fetch per
 # company per day serves every date a run asks about.
@@ -107,11 +119,20 @@ def _user_agent() -> str:
 
 def _fetch_json(url: str) -> dict:
     """Read a public EDGAR document, respecting SEC's identification rule."""
+    if is_host_blocked(url):
+        # Logged once when the host was parked, not once per statement call.
+        raise VendorUnavailableError(blocked_notice(url))
     try:
-        response = requests.get(url, headers={"User-Agent": _user_agent()}, timeout=30)
+        response = requests.get(
+            url, headers={"User-Agent": _user_agent()}, timeout=_REQUEST_TIMEOUT
+        )
+        # The connection worked, so any earlier parking is no longer true.
+        clear_host_block(url)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as exc:
+        if is_connect_level_failure(exc):
+            block_host(url, type(exc).__name__)
         status = getattr(getattr(exc, "response", None), "status_code", None)
         # Every failure here is "this vendor cannot serve it now", so the router
         # moves on instead of seeing a transport exception it has no rule for.

@@ -6,13 +6,22 @@ from io import StringIO
 import pandas as pd
 
 from tradingagents.dataflows.errors import VendorNotConfiguredError, VendorUnavailableError
-from tradingagents.dataflows.net import get_scrubbed
+from tradingagents.dataflows.net import (
+    CONNECT_TIMEOUT,
+    block_host,
+    blocked_notice,
+    clear_host_block,
+    get_scrubbed,
+    is_connect_level_failure,
+    is_host_blocked,
+)
 
 API_BASE_URL = "https://www.alphavantage.co/query"
 
-# Network timeout (seconds) so a stalled Alpha Vantage request can't hang the
-# CLI/agents indefinitely (#990).
-REQUEST_TIMEOUT = 30
+# Fail fast when this network cannot reach the host at all, but stay patient
+# for the body: Alpha Vantage builds full time series, and a slow live reply is
+# worth waiting for (#990).
+REQUEST_TIMEOUT = (CONNECT_TIMEOUT, 20.0)
 
 
 class AlphaVantageNotConfiguredError(VendorNotConfiguredError):
@@ -92,9 +101,19 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
         # Remove entitlement if it's None or empty
         api_params.pop("entitlement", None)
 
-    response = get_scrubbed(
-        API_BASE_URL, params=api_params, timeout=REQUEST_TIMEOUT, secret=api_key
-    )
+    if is_host_blocked(API_BASE_URL):
+        # Logged once when the host was parked, not once per tool call.
+        raise VendorUnavailableError(blocked_notice(API_BASE_URL))
+
+    try:
+        response = get_scrubbed(
+            API_BASE_URL, params=api_params, timeout=REQUEST_TIMEOUT, secret=api_key
+        )
+    except Exception as exc:
+        if is_connect_level_failure(exc):
+            block_host(API_BASE_URL, type(exc).__name__)
+        raise
+    clear_host_block(API_BASE_URL)
 
     response_text = response.text
 

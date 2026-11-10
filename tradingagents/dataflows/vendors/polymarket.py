@@ -16,24 +16,43 @@ from datetime import UTC, datetime
 
 import requests
 
+from tradingagents.dataflows import net
 from tradingagents.dataflows.date_window import is_historical
 
 logger = logging.getLogger(__name__)
 
 GAMMA_BASE = "https://gamma-api.polymarket.com"
 
-# Network timeout (seconds), consistent with the other vendors.
-REQUEST_TIMEOUT = 30
+# Fail fast. Gamma is a keyless offshore endpoint: from a network that routes
+# around it, a flat 30s connect budget was spent on every topic the news
+# analyst asked about, and it never bought a response.
+REQUEST_TIMEOUT = net.DEFAULT_TIMEOUT
 
 # Default number of markets to return, ranked by traded volume.
 DEFAULT_LIMIT = 6
 
 
+class _GammaParked(requests.RequestException):
+    """Gamma is parked after an earlier connect failure; no request was made.
+
+    A ``RequestException`` subclass so the caller's existing network-error
+    branch handles it, while still being distinguishable for the log noise.
+    """
+
+
 def _request(path: str, params: dict) -> dict:
-    response = requests.get(
-        f"{GAMMA_BASE}/{path}", params=params, timeout=REQUEST_TIMEOUT
-    )
-    response.raise_for_status()
+    url = f"{GAMMA_BASE}/{path}"
+    if net.is_host_blocked(url):
+        raise _GammaParked(net.blocked_notice(url))
+    try:
+        response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+    except (requests.ConnectTimeout, requests.ConnectionError) as e:
+        # A connect-level failure says nothing about the topic asked for, so
+        # park the host instead of re-asking it for every remaining topic.
+        net.block_host(url, type(e).__name__)
+        raise
+    net.clear_host_block(url)
     return response.json()
 
 
@@ -110,6 +129,10 @@ def get_prediction_markets(topic: str, limit: int | None = None, as_of_date: str
 
     try:
         data = _request("public-search", {"q": topic, "limit_per_type": 20})
+    except _GammaParked as e:
+        # The parking was logged when it happened; repeating it per topic would
+        # put back the noise this path exists to remove.
+        return f"Polymarket data is currently unavailable ({e})."
     except requests.RequestException as e:
         logger.warning("Polymarket search failed for %r: %s", topic, e)
         return (

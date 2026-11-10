@@ -160,6 +160,44 @@ def backtest(
         console.print(f"[yellow]unsettled:[/yellow] {ticker}: {reason}")
 
 
+@app.command()
+def screener(
+    top: int = typer.Option(3, "--top", help="Number of stocks to recommend (default: 3)"),
+    date: str = typer.Option(None, "--date", help="Analysis date, YYYY-MM-DD (default: today)"),
+    save: bool = typer.Option(True, "--save/--no-save", help="Save reports (default: yes)"),
+    html: bool = typer.Option(
+        True,
+        "--html/--no-html",
+        help="Also write each recommended stock's full report as one self-contained "
+        "HTML page, next to its Markdown (default: yes)",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes/--no-yes",
+        help="Skip the confirmation before deep analysis, for scheduled or unattended "
+        "runs where nobody is at a prompt",
+    ),
+    max_candidates: int = typer.Option(50, "--max-candidates", help="Max candidates to analyze (default: 50)"),
+    workers: int = typer.Option(3, "--workers", help="Max concurrent analyses (default: 3)"),
+):
+    """Scan A-share market and recommend top stocks based on multi-factor analysis."""
+    from tradingagents.screener.a_stock_screener import run_screener
+
+    try:
+        run_screener(
+            top_n=top,
+            analysis_date=date,
+            save_reports=save,
+            generate_html=html,
+            max_candidates=max_candidates,
+            max_workers=workers,
+            assume_yes=yes,
+        )
+    except Exception as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from None
+
+
 # The plans `login` and `logout` take: the providers signed in to, not keyed.
 Plan = StrEnum("Plan", {name: name for name in SIGNED_IN_PROVIDERS})
 

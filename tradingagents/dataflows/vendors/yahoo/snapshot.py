@@ -16,6 +16,7 @@ import pandas as pd
 from stockstats import wrap
 
 from tradingagents.dataflows.errors import NoMarketDataError
+from tradingagents.dataflows.router import route_to_vendor
 from tradingagents.dataflows.symbols import normalize_symbol
 from tradingagents.dataflows.vendors.yahoo.common import price_text
 from tradingagents.dataflows.vendors.yahoo.ohlcv import load_ohlcv
@@ -27,6 +28,11 @@ DEFAULT_SNAPSHOT_INDICATORS: tuple[str, ...] = (
     "macd", "macds", "macdh", "atr",
 )
 
+# Calendar history fetched for a China snapshot: the longest default indicator
+# (close_200_sma) needs ~290 calendar days of trading bars; 400 leaves a
+# margin for holidays and suspensions.
+_CHINA_SNAPSHOT_HISTORY_DAYS = 400
+
 
 def _verified_rows(symbol: str, as_of_date: str) -> pd.DataFrame:
     """OHLCV on or before as_of_date, date-sorted. Raises NoMarketDataError if nothing usable.
@@ -34,10 +40,28 @@ def _verified_rows(symbol: str, as_of_date: str) -> pd.DataFrame:
     ``load_ohlcv`` already normalizes the Date column and filters out
     look-ahead rows, but we re-apply the cutoff defensively — this is a
     verification path, so it must not trust its input to be pre-filtered.
+
+    China-listed tickers (.SS/.SZ) fetch through the configured vendor chain
+    instead of yfinance: when the chain is pinned to AKShare (the screener's
+    deep-analysis stage), the snapshot — the market analyst's source of
+    truth — must honour that chain rather than silently hitting Yahoo.
     """
-    # As reported: this snapshot is quoted by the agents as exact prices, so a
-    # gap-filled cell would put the previous session's number under this date.
-    data = load_ohlcv(symbol, as_of_date, fill_gaps=False)
+    if symbol.upper().endswith((".SS", ".SZ")):
+        start = (
+            pd.Timestamp(as_of_date)
+            - pd.Timedelta(days=_CHINA_SNAPSHOT_HISTORY_DAYS)
+        ).strftime("%Y-%m-%d")
+        result = route_to_vendor("get_stock_data", symbol, start, as_of_date)
+        if not isinstance(result, pd.DataFrame):
+            # A degraded (optional-category style) sentinel string instead of
+            # a frame — surface it as a missing snapshot, never a fallback.
+            raise NoMarketDataError(symbol, normalize_symbol(symbol), str(result))
+        # AKShare's get_stock_data returns a Date-indexed frame.
+        data = result.reset_index()
+    else:
+        # As reported: this snapshot is quoted by the agents as exact prices, so a
+        # gap-filled cell would put the previous session's number under this date.
+        data = load_ohlcv(symbol, as_of_date, fill_gaps=False)
     if data is None or data.empty:
         raise NoMarketDataError(symbol, normalize_symbol(symbol), "no price rows")
 

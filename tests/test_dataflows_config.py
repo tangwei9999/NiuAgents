@@ -20,7 +20,13 @@ class DataflowsConfigIsolationTests(unittest.TestCase):
         cfg["tool_vendors"]["get_stock_data"] = "alpha_vantage"
 
         fresh = get_config()
-        self.assertEqual(fresh["data_vendors"]["core_stock_apis"], "yfinance")
+        # Read the default back rather than a literal: the point is that the
+        # mutation did not reach the shared config, whichever vendors a given
+        # install prefers.
+        self.assertEqual(
+            fresh["data_vendors"]["core_stock_apis"],
+            default_config.DEFAULT_CONFIG["data_vendors"]["core_stock_apis"],
+        )
         self.assertNotIn("get_stock_data", fresh["tool_vendors"])
 
     def test_set_config_does_not_alias_caller_nested_dicts(self):
@@ -47,10 +53,12 @@ class DataflowsConfigIsolationTests(unittest.TestCase):
         )
 
         fresh = get_config()
+        defaults = default_config.DEFAULT_CONFIG["data_vendors"]
         self.assertEqual(fresh["data_vendors"]["core_stock_apis"], "alpha_vantage")
-        self.assertEqual(fresh["data_vendors"]["technical_indicators"], "yfinance")
-        self.assertEqual(fresh["data_vendors"]["fundamental_data"], "sec_edgar,yfinance")
-        self.assertEqual(fresh["data_vendors"]["news_data"], "yfinance")
+        # Keys the partial update omits keep their installed defaults, whatever
+        # they are: a fork that routes a category elsewhere must not fail here.
+        for key in ("technical_indicators", "fundamental_data", "news_data"):
+            self.assertEqual(fresh["data_vendors"][key], defaults[key])
 
     def test_nested_dict_updates_merge_one_level_deep(self):
         set_config({"tool_vendors": {"get_stock_data": "alpha_vantage"}})
@@ -95,7 +103,13 @@ def test_a_run_reads_its_own_graphs_vendors_not_the_last_graph_built():
     set_config(first)                                   # graph A is built
     second = _graph(copy.deepcopy(default_config.DEFAULT_CONFIG))
 
-    assert _vendors_seen_by_a_run(second) == ["sec_edgar,yfinance"]
+    # The override belonged to graph A, so this run reads the category default.
+    # Derived from the installed config rather than spelled out: in the upstream
+    # default the two strings happen to be identical, which made asserting the
+    # literal a check that could not see the leak it guards against.
+    assert _vendors_seen_by_a_run(second) == [
+        default_config.DEFAULT_CONFIG["data_vendors"]["fundamental_data"]
+    ]
 
 
 @pytest.mark.unit

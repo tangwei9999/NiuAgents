@@ -30,6 +30,12 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from tradingagents.dataflows.date_window import coverage_gap, in_window
+from tradingagents.dataflows.net import (
+    SOCKET_TIMEOUT,
+    block_host,
+    is_connect_level_failure,
+    is_host_blocked,
+)
 from tradingagents.dataflows.symbols import crypto_base
 
 logger = logging.getLogger(__name__)
@@ -66,6 +72,8 @@ def _coverage_dates(posts) -> list:
 
 
 _RSS = "https://www.reddit.com/r/{sub}/search.rss?{qs}"
+# Parking is per host, not per feed URL.
+_REDDIT_BASE = "https://www.reddit.com"
 # A descriptive, identified User-Agent (per Reddit's API etiquette). Reddit
 # blocks generic/anonymous tokens like bare "Mozilla/5.0" or "curl/…" but
 # serves this one on both endpoints; the RSS feed accepts it even when the
@@ -201,6 +209,11 @@ def _fetch_subreddit_rss(
     discussion that was never observed (#1295).
     """
     url = _RSS.format(sub=sub, qs=_search_qs(ticker, limit))
+    if is_host_blocked(_REDDIT_BASE):
+        # Reddit is unreachable from this network; the caller already renders
+        # ``None`` as "fetch failed", which is not an absence of discussion.
+        # Logged once when the host was parked, so this stays quiet.
+        return None
     req = Request(url, headers={"User-Agent": _UA})
     try:
         with urlopen(req, timeout=timeout) as resp:
@@ -222,6 +235,11 @@ def _fetch_subreddit_rss(
     except (OSError, http.client.HTTPException, ET.ParseError) as exc:
         # OSError covers URLError/TimeoutError/connection resets; HTTPException
         # covers chunked-transfer errors (IncompleteRead/BadStatusLine, #1024).
+        if is_connect_level_failure(exc):
+            # Reddit's RSS is one of several offshore social sources: from a
+            # network that cannot reach it, a 10s wait per ticker per analyst
+            # bought nothing but a warning line.
+            block_host(_REDDIT_BASE, type(exc).__name__)
         logger.warning("Reddit RSS fetch failed for r/%s · %s: %s", sub, ticker, exc)
         return None
 
@@ -250,7 +268,7 @@ def fetch_reddit_posts(
     subreddits: Iterable[str] | None = None,
     *,
     limit_per_sub: int = 5,
-    timeout: float = 10.0,
+    timeout: float = SOCKET_TIMEOUT,
     start_date: str | None = None,
     end_date: str | None = None,
     screen=None,

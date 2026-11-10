@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents A股实战指南 — 从安装到选股</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --green: #4ade80; --orange: #fb923c; --pink: #f472b6;
+    --purple: #a78bfa; --yellow: #fbbf24; --red: #f87171;
+    --teal: #2dd4bf; --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; line-height: 1.8; }
+
+  .header { text-align: center; padding: 48px 20px 24px; }
+  .header h1 { font-size: 2rem; background: linear-gradient(135deg, var(--red), var(--orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--muted); margin-top: 8px; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* Warning Banner */
+  .warn-banner { background: rgba(248,113,113,.1); border: 2px solid var(--red); border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
+  .warn-banner h3 { color: var(--red); font-size: 1.1rem; margin-bottom: 8px; }
+  .warn-banner p, .warn-banner li { font-size: .9rem; color: var(--muted); }
+  .warn-banner ul { padding-left: 20px; }
+
+  /* Step */
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .step-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .step-num { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1rem; flex-shrink: 0; }
+  .step-header h2 { font-size: 1.2rem; color: var(--accent); }
+  .step-header .time { margin-left: auto; font-size: .8rem; color: var(--muted); background: var(--surface2); padding: 4px 12px; border-radius: 12px; white-space: nowrap; }
+
+  .step h3 { font-size: 1rem; color: var(--teal); margin: 16px 0 8px; }
+  .step p { font-size: .9rem; color: var(--muted); margin-bottom: 10px; }
+  .step strong { color: var(--text); }
+
+  /* Code Block */
+  .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; margin: 12px 0; overflow: hidden; }
+  .code-header { background: var(--surface2); padding: 6px 14px; font-size: .78rem; color: var(--muted); font-family: 'Cascadia Code', 'Fira Code', monospace; display: flex; justify-content: space-between; }
+  .code-header .lang { color: var(--accent); font-weight: 600; }
+  .code-body { padding: 14px; overflow-x: auto; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .82rem; line-height: 1.7; color: #e2e8f0; }
+  .code-body .cm { color: #5c6370; font-style: italic; }
+  .code-body .kw { color: #c678dd; }
+  .code-body .str { color: #98c379; }
+  .code-body .fn { color: #61afef; }
+
+  /* Annotation */
+  .annotation { background: rgba(251,191,36,.06); border-left: 3px solid var(--yellow); padding: 12px 16px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+  .annotation .label { color: var(--yellow); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: 1px; }
+  .annotation p { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+
+  /* Tip */
+  .tip { background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.2); border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .tip .tip-label { color: var(--green); font-weight: 700; font-size: .8rem; }
+  .tip p { font-size: .85rem; color: var(--muted); margin-top: 4px; }
+
+  /* Concept */
+  .concept { background: rgba(56,189,248,.06); border: 1px solid rgba(56,189,248,.2); border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .concept h4 { color: var(--accent); font-size: .9rem; margin-bottom: 6px; }
+  .concept p, .concept li { font-size: .85rem; color: var(--muted); }
+  .concept ul { padding-left: 20px; }
+
+  /* Table */
+  .info-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .85rem; }
+  .info-table th { text-align: left; padding: 8px 12px; background: rgba(56,189,248,.08); color: var(--accent); border-bottom: 2px solid var(--border); font-weight: 600; }
+  .info-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); }
+
+  /* Flow */
+  .flow { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; overflow-x: auto; }
+  .flow-title { font-size: .85rem; color: var(--teal); font-weight: 700; margin-bottom: 12px; text-align: center; }
+  .flow-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .flow-node { padding: 8px 16px; border-radius: 8px; font-size: .8rem; font-weight: 600; text-align: center; border: 2px solid; white-space: nowrap; }
+  .flow-node.blue { background: rgba(56,189,248,.1); border-color: var(--accent); color: var(--accent); }
+  .flow-node.green { background: rgba(74,222,128,.1); border-color: var(--green); color: var(--green); }
+  .flow-node.orange { background: rgba(251,146,60,.1); border-color: var(--orange); color: var(--orange); }
+  .flow-node.purple { background: rgba(167,139,250,.1); border-color: var(--purple); color: var(--purple); }
+  .flow-node.yellow { background: rgba(251,191,36,.1); border-color: var(--yellow); color: var(--yellow); }
+  .flow-node.red { background: rgba(248,113,113,.1); border-color: var(--red); color: var(--red); }
+  .flow-arrow { color: var(--muted); font-size: 1.1rem; }
+  .flow-arrow-down { text-align: center; color: var(--muted); font-size: 1rem; margin: 4px 0; }
+
+  /* Script Block */
+  .script-block { background: var(--code-bg); border: 2px solid var(--green); border-radius: 10px; margin: 16px 0; overflow: hidden; }
+  .script-block .code-header { background: rgba(74,222,128,.15); color: var(--green); font-weight: 700; }
+
+  .footer { text-align: center; padding: 40px 20px; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.4rem; }
+    .code-body { font-size: .72rem; }
+    .step-header .time { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TradingAgents A股实战指南</h1>
+  <p>从安装到运行，使用内置选股器自动分析 A 股并选出 3 只推荐买入股票 + 卖出点位</p>
+</div>
+
+<div class="container">
+
+<!-- Warning -->
+<div class="warn-banner">
+  <h3>重要声明</h3>
+  <ul>
+    <li><strong>本项目仅供研究，不构成投资建议。</strong>官方明确声明："It is not intended as financial, investment, or trading advice."</li>
+    <li>系统输出的是 <strong>5 级评级</strong>（Buy/Overweight/Hold/Underweight/Sell），<strong>不直接给出具体价格点位</strong>。</li>
+    <li>卖出点位需要结合技术分析师输出的 <strong>RSI / MACD / 布林带</strong> 等指标自行判断，本指南会教你怎么读。</li>
+    <li>A 股数据来自 <strong>四大境内源</strong>（BaoStock > AKShare 腾讯 > AKShare 新浪 > AKShare 东财），覆盖全 A 股 5000+ 只股票，支持多源回退，不访 Yahoo。</li>
+    <li>LLM 输出有随机性，同一只股票跑两次结果可能不同。</li>
+  </ul>
+</div>
+
+<!-- ==================== STEP 1 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">1</div>
+    <h2>安装 Python 环境</h2>
+    <span class="time">约 10 分钟</span>
+  </div>
+
+  <h3>1.1 确认 Python 版本</h3>
+  <p>TradingAgents 需要 <strong>Python 3.11 或更高版本</strong>。打开 PowerShell，运行：</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 检查 Python 版本</div>
+    <div class="code-body">
+<span class="fn">python</span> --version
+<span class="cm"># 应该显示 Python 3.11.x 或更高</span>
+<span class="cm"># 如果显示 3.10 或更低，需要升级 Python</span>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <div class="label">如果 Python 版本太低</div>
+    <p>去 <a href="https://www.python.org/downloads/" style="color:var(--accent);">python.org</a> 下载最新版 Python 安装。安装时<strong>一定要勾选 "Add Python to PATH"</strong>。</p>
+  </div>
+
+  <h3>1.2 克隆项目</h3>
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 克隆代码仓库</div>
+    <div class="code-body">
+<span class="cm"># 选一个你喜欢的目录</span>
+<span class="kw">cd</span> D:\java_projects
+<span class="fn">git</span> clone https://github.com/TauricResearch/TradingAgents.git
+<span class="kw">cd</span> TradingAgents
+    </div>
+  </div>
+
+  <h3>1.3 创建虚拟环境并安装</h3>
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 创建环境 + 安装依赖</div>
+    <div class="code-body">
+<span class="cm"># 创建虚拟环境（Python 3.11+）</span>
+<span class="fn">python</span> -m venv .venv
+
+<span class="cm"># 激活虚拟环境</span>
+<span class="fn">.\.venv\Scripts\activate.bat</span>
+
+<span class="cm"># 安装项目（会自动安装所有依赖）</span>
+<span class="fn">pip</span> install .
+
+<span class="cm"># 如果 pip install 太慢，可以用国内镜像：</span>
+<span class="fn">pip</span> install . -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+    </div>
+  </div>
+
+  <div class="tip">
+    <div class="tip-label">验证安装成功</div>
+    <p>运行 <code>tradingagents --help</code>，如果看到帮助信息说明安装成功了。</p>
+  </div>
+</div>
+
+<!-- ==================== STEP 2 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">2</div>
+    <h2>配置 API Keys</h2>
+    <span class="time">约 5 分钟</span>
+  </div>
+
+  <h3>2.1 创建 .env 文件</h3>
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span></div>
+    <div class="code-body">
+<span class="fn">cp</span> .env.example .env
+    </div>
+  </div>
+
+  <h3>2.2 编辑 .env 填入密钥</h3>
+  <p>用记事本打开 <code>.env</code> 文件，<strong>至少需要填一个 LLM 的 API Key</strong>：</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">Bash</span> .env 文件（最小配置）</div>
+    <div class="code-body">
+<span class="cm"># === 必须：选一个 LLM 提供商 ===</span>
+<span class="cm"># 选项 A：OpenAI（推荐，效果最好）</span>
+TRADINGAGENTS_LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-你的OpenAI密钥
+
+<span class="cm"># 选项 B：Google Gemini（便宜）</span>
+<span class="cm"># TRADINGAGENTS_LLM_PROVIDER=google</span>
+<span class="cm"># GOOGLE_API_KEY=你的Gemini密钥</span>
+
+<span class="cm"># 选项 C：DeepSeek（国产，便宜）</span>
+<span class="cm"># TRADINGAGENTS_LLM_PROVIDER=deepseek</span>
+<span class="cm"># DEEPSEEK_API_KEY=你的DeepSeek密钥</span>
+
+<span class="cm"># === 模型选择 ===</span>
+<span class="cm"># quick_think：分析师/研究员/交易员用（10个角色）</span>
+TRADINGAGENTS_QUICK_THINK_LLM=gpt-4o
+
+<span class="cm"># deep_think：经理层用（3个角色，需要深度推理）</span>
+TRADINGAGENTS_DEEP_THINK_LLM=gpt-4o
+
+<span class="cm"># === 可选：输出语言改为中文 ===</span>
+TRADINGAGENTS_OUTPUT_LANGUAGE=Chinese
+
+<span class="cm"># === 可选：增加辩论轮数提高分析质量 ===</span>
+TRADINGAGENTS_MAX_DEBATE_ROUNDS=2
+TRADINGAGENTS_MAX_RISK_ROUNDS=2
+    </div>
+  </div>
+
+  <div class="concept">
+    <h4>各 LLM 提供商的 API Key 获取方式</h4>
+    <table class="info-table">
+      <tr><th>提供商</th><th>获取地址</th><th>价格参考</th><th>推荐度</th></tr>
+      <tr><td>OpenAI</td><td>platform.openai.com</td><td>$2.5/1M tokens</td><td>⭐⭐⭐ 效果最好</td></tr>
+      <tr><td>Google Gemini</td><td>aistudio.google.com</td><td>免费额度较多</td><td>⭐⭐ 性价比高</td></tr>
+      <tr><td>DeepSeek</td><td>platform.deepseek.com</td><td>非常便宜</td><td>⭐⭐ 国产首选</td></tr>
+      <tr><td>Anthropic Claude</td><td>console.anthropic.com</td><td>较贵</td><td>⭐⭐⭐ 推理强</td></tr>
+      <tr><td>Ollama（本地）</td><td>ollama.com</td><td>免费</td><td>⭐ 无需 API Key</td></tr>
+    </table>
+  </div>
+
+  <div class="annotation">
+    <div class="label">关于数据源 API Key</div>
+    <p><strong>BaoStock 不需要 API Key</strong>，免费无限流，专为 A 股设计，最稳定。这是首选数据源。</p>
+    <p><strong>AKShare（腾讯/新浪/东方财富）不需要 API Key</strong>，可以直接用。覆盖 5000+ 只 A 股，按稳定性依次回退。</p>
+    <p><strong>选股器不用 Yahoo 兜底</strong>：海外源不可达只会返回“没数据”，与“这只票本身没数据”分不开；四个境内源都落空就记为无数据。Yahoo（yfinance）仅服务美股链路，同样不需要 API Key。</p>
+    <p><strong>Alpha Vantage</strong>（备选数据源）：免费 Key 在 alphavantage.co 注册获取，填 <code>ALPHA_VANTAGE_API_KEY=xxx</code>。</p>
+    <p><strong>FRED</strong>（宏观经济数据，可选）：免费 Key 在 fred.stlouisfed.org 注册，填 <code>FRED_API_KEY=xxx</code>。</p>
+  </div>
+</div>
+
+<!-- ==================== STEP 3 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">3</div>
+    <h2>理解 A 股 Ticker 格式</h2>
+    <span class="time">约 3 分钟</span>
+  </div>
+
+  <div class="concept">
+    <h4>A 股 Ticker 命名规则</h4>
+    <table class="info-table">
+      <tr><th>交易所</th><th>后缀</th><th>例子</th><th>说明</th></tr>
+      <tr><td>上海证券交易所</td><td><code>.SS</code></td><td><code>600519.SS</code>（贵州茅台）</td><td>60 开头的股票</td></tr>
+      <tr><td>深圳证券交易所</td><td><code>.SZ</code></td><td><code>000858.SZ</code>（五粮液）</td><td>00/002/300 开头的股票</td></tr>
+    </table>
+    <p style="margin-top:8px;">系统会自动识别后缀并匹配对应的区域基准指数（上证 → 000001.SS，深证 → 399001.SZ）来计算 Alpha 回报。</p>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">Python</span> symbols.py 中的 A 股映射规则</div>
+    <div class="code-body">
+<span class="cm"># 如果你输入 600519.SH，系统会自动转为 600519.SS</span>
+<span class="cm"># 因为 Yahoo Finance 用 .SS 表示上海，.SZ 表示深圳</span>
+
+<span class="cm"># 常见 A 股蓝筹股 ticker 对照表：</span>
+<span class="cm"># 600519.SS  贵州茅台（上海）</span>
+<span class="cm"># 000858.SZ  五粮液（深圳）</span>
+<span class="cm"># 601318.SS  中国平安（上海）</span>
+<span class="cm"># 000333.SZ  美的集团（深圳）</span>
+<span class="cm"># 600036.SS  招商银行（上海）</span>
+<span class="cm"># 002594.SZ  比亚迪（深圳）</span>
+<span class="cm"># 601012.SS  隆基绿能（上海）</span>
+<span class="cm"># 300750.SZ  宁德时代（深圳）</span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STEP 4 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">4</div>
+    <h2>运行分析：选出 3 只推荐买入股票</h2>
+    <span class="time">约 15-60 分钟（候选越多越久）</span>
+  </div>
+
+  <h3>4.0 方法零：用内置选股器自动扫描全市场（最推荐 ⭐）</h3>
+  <p><strong>无需提供候选股票池</strong>，选股器会自动从 A 股全市场（5000+ 只）中扫描、四维筛选、深度分析并推荐 Top 3 股票。</p>
+
+  <div class="concept">
+    <h4>🎯 五步筛选 + 交互确认 + 深度分析</h4>
+    <ul>
+      <li><strong>第一阶段：逐级筛选潜力股</strong></li>
+      <li style="margin-left: 20px;">第 1 步：获取股票池 - AKShare 全 A 股 ~5200 只</li>
+      <li style="margin-left: 20px;">第 2 步：基础过滤 - 剔除 ST/科创板/北交所，只留主板/中小板/创业板</li>
+      <li style="margin-left: 20px;">第 3 步：资金面预筛选 - 主力净流入>0，取前 100 只（盘前自动改用最近一个交易日的净流入）</li>
+      <li style="margin-left: 20px;">第 4 步：消息面筛选 - 从资金流入前 20 板块中找出近 7 天有利好的板块，保留属于这些板块的股票</li>
+      <li style="margin-left: 20px;">第 5 步：技术指标筛选 - RSI 30-65、股价>MA20、MACD 金叉、量比≥0.8 → 几十只潜力股</li>
+      <li style="margin-left: 20px;">❓ 交互确认 - 打印潜力股列表，询问是否继续深度分析（选否则结束，--yes 跳过提问）</li>
+      <li><strong>第二阶段：深度分析找出 Top 3</strong></li>
+      <li style="margin-left: 20px;">第 6 步：多智能体深度分析 - TradingAgents 分析引擎（每只 3-5 分钟）</li>
+      <li style="margin-left: 20px;">第 7 步：综合评分排序 - LLM 评级 40% + 技术面 30% + 资金面 20% + 动量 10%</li>
+      <li style="margin-left: 20px;">🏆 最终推荐输出 - 表格列出 Top 3 股票代码、股票名称、上涨潜力分数、综合评级</li>
+      <li style="margin-left: 20px;">📌 交易点位建议 - 每只股票一行：阻力位、支撑位、建议买入价、建议卖出价</li>
+      <li style="margin-left: 20px;">第 8 步：生成报告 - 每只推荐股落盘完整报告树（分节 md + complete_report.md/html），另存 topN 摘要</li>
+    </ul>
+  </div>
+
+  <div class="concept">
+    <h4>筛选漏斗（逐级收敛）</h4>
+    <table class="info-table" style="margin-top: 10px;">
+      <tr><th>步骤</th><th>筛选条件</th><th>目的</th></tr>
+      <tr>
+        <td><strong>第 2 步：基础过滤</strong></td>
+        <td>剔除 ST、科创板（688）、北交所（8/4 开头）</td>
+        <td>只留主板/中小板/创业板，降低风险</td>
+      </tr>
+      <tr>
+        <td><strong>第 3 步：资金面</strong></td>
+        <td>主力净流入 > 0，取前 100 只<br><small>盘前自动改用最近一个交易日的净流入</small></td>
+        <td>机构资金关注，有上涨动力</td>
+      </tr>
+      <tr>
+        <td><strong>第 4 步：消息面</strong></td>
+        <td>属于近一周有利好消息的板块（利好关键词命中）</td>
+        <td>政策/业绩利好，催化剂</td>
+      </tr>
+      <tr>
+        <td><strong>第 5 步：技术面</strong></td>
+        <td>RSI 30-65、股价>MA20、MACD 金叉、量比≥0.8</td>
+        <td>早期上升趋势，避免追高</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 运行内置选股器（一键扫描全市场）</div>
+    <div class="code-body">
+<span class="cm"># 第一步：激活虚拟环境</span>
+<span class="fn">.\.venv\Scripts\activate.bat</span>
+
+<span class="cm"># 第二步：运行选股器（自动推荐 Top 3）</span>
+<span class="fn">tradingagents</span> screener --top 3 --workers 1
+
+<span class="cm"># 运行后会：</span>
+<span class="cm"># 1. 从 5000+ 只 A 股中筛选潜力股</span>
+<span class="cm"># 2. 打印潜力股列表（按潜力评分降序）</span>
+<span class="cm"># 3. 询问是否继续深度分析（选 Y 继续 / 选 n 结束；加 --yes 跳过提问）</span>
+<span class="cm"># 4. 深度分析后输出最终推荐 Top 3（股票代码/名称/上涨潜力分数）</span>
+<span class="cm"># 5. 每只股票一行交易点位（阻力位/支撑位/建议买入价/建议卖出价）</span>
+<span class="cm"># 6. 每只推荐股落盘完整报告树：分节 Markdown + complete_report.md + 自包含 HTML</span>
+<span class="cm"># 数据源：筛选与深度分析全链路境内源（AKShare/BaoStock），不回退 Yahoo</span>
+
+<span class="cm"># 可选参数：</span>
+<span class="cm">#   --top N              推荐股票数量（默认 3）</span>
+<span class="cm">#   --workers N          并发分析数（默认 3，建议用 1 避免限流）</span>
+<span class="cm">#   --date YYYY-MM-DD    分析日期（默认今天）</span>
+<span class="cm">#   --save/--no-save     是否保存报告（默认保存）</span>
+<span class="cm">#   --html/--no-html     每只完整报告是否附带 HTML 页（默认生成）</span>
+<span class="cm">#   --max-candidates N   进入深度分析的潜力股上限（默认 50，按潜力评分截断）</span>
+<span class="cm">#   --yes                跳过交互确认（无人值守/定时任务用）</span>
+
+<span class="cm"># 示例：指定日期分析</span>
+<span class="fn">tradingagents</span> screener --top 3 --workers 1 --date 2026-11-09
+    </div>
+  </div>
+
+  <div class="tip">
+    <div class="tip-label">数据源优先级</div>
+    <p>技术指标链：<strong>BaoStock</strong>（免费无限流）→ AKShare 腾讯 → AKShare 新浪 → AKShare 东方财富；交易点位 K 线链：东方财富（前复权）→ 腾讯 → 新浪 → BaoStock。两条链都只走境内源、不访 Yahoo，源全部落空就记为无数据而不是丢候选。深度分析的数据路由也以 AKShare 优先（见 default_config 的 data_vendors）。</p>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">内置选股器数据源回退机制（只走境内源，不访 Yahoo）</div>
+    <div class="flow-row">
+      <div class="flow-node green">BaoStock<br><small>⭐⭐⭐⭐⭐ 免费无限流</small></div>
+      <div class="flow-arrow">→ 失败时 →</div>
+      <div class="flow-node green">AKShare 腾讯<br><small>⭐⭐⭐⭐ 限流少</small></div>
+      <div class="flow-arrow">→ 失败时 →</div>
+      <div class="flow-node green">AKShare 新浪<br><small>⭐⭐⭐⭐ 较稳定</small></div>
+      <div class="flow-arrow">→ 失败时 →</div>
+      <div class="flow-node green">AKShare 东财<br><small>⭐⭐⭐⭐⭐ 数据最全但易限流</small></div>
+    </div>
+    <div class="flow-row" style="margin-top:8px;">
+      <div class="flow-node orange">交易点位 K 线链<br><small>东财（前复权）→ 腾讯 → 新浪 → BaoStock</small></div>
+      <div class="flow-arrow">·</div>
+      <div class="flow-node orange">全部落空<br><small>记为无数据，不丢候选也不卡死</small></div>
+    </div>
+  </div>
+
+  <h3>4.1 方法一：用 CLI 交互式运行（推荐新手）</h3>
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 启动 CLI</div>
+    <div class="code-body">
+<span class="cm"># 确保虚拟环境已激活</span>
+<span class="fn">.\.venv\Scripts\activate.bat</span>
+
+<span class="cm"># 重要：必须退回上一级目录，否则本地 tradingagents 文件夹会遮蔽 CLI 命令</span>
+<span class="fn">cd</span> ..
+
+<span class="cm"># 启动交互式 CLI</span>
+<span class="fn">tradingagents</span>
+    </div>
+  </div>
+
+  <p>CLI 会依次问你以下问题，按提示回答：</p>
+
+  <table class="info-table">
+    <tr><th>问题</th><th>你应该填什么</th><th>说明</th></tr>
+    <tr><td>Ticker</td><td><code>600519.SS</code></td><td>贵州茅台（上海交易所）</td></tr>
+    <tr><td>Date</td><td>按回车（默认今天）</td><td>分析今天的市场</td></tr>
+    <tr><td>LLM Provider</td><td>选你配置的（如 openai）</td><td>用哪个 AI</td></tr>
+    <tr><td>Analysts</td><td>全选（market, social, news, fundamentals）</td><td>4 个分析师都启用</td></tr>
+    <tr><td>Debate rounds</td><td>2</td><td>多空各说 2 轮，分析更深入</td></tr>
+    <tr><td>Risk rounds</td><td>2</td><td>风控辩论 2 轮</td></tr>
+    <tr><td>Save report?</td><td>Yes</td><td>保存分析报告</td></tr>
+    <tr><td>Open HTML?</td><td>Yes</td><td>在浏览器中查看报告</td></tr>
+  </table>
+
+  <div class="tip">
+    <div class="tip-label">需要分析多只股票</div>
+    <p>对每只候选股票都跑一次 <code>tradingagents</code>，记录每只的评级结果。最后对比选出评级最高的 3 只。</p>
+  </div>
+
+  <h3>4.2 方法二：用脚本批量分析（推荐）</h3>
+  <p>创建一个 Python 脚本，批量分析多只 A 股，自动对比结果：</p>
+
+  <div class="script-block">
+    <div class="code-header"><span class="lang">Python</span> analyze_astocks.py — 批量分析 A 股并排序</div>
+    <div class="code-body">
+<span class="str">"""
+批量分析 A 股股票，按评级排序，选出 Top 3 推荐买入。
+用法：python analyze_astocks.py
+"""</span>
+
+<span class="kw">from</span> tradingagents.graph.trading_graph <span class="kw">import</span> TradingAgentsGraph
+<span class="kw">from</span> tradingagents.default_config <span class="kw">import</span> DEFAULT_CONFIG
+<span class="kw">from</span> tradingagents.agents.rating <span class="kw">import</span> parse_rating
+<span class="kw">from</span> datetime <span class="kw">import</span> date
+
+<span class="cm"># === 第 1 步：配置 ===</span>
+config = DEFAULT_CONFIG.copy()
+config[<span class="str">"output_language"</span>] = <span class="str">"Chinese"</span>        <span class="cm"># 报告用中文</span>
+config[<span class="str">"max_debate_rounds"</span>] = <span class="num">2</span>             <span class="cm"># 多空各 2 轮辩论</span>
+config[<span class="str">"max_risk_discuss_rounds"</span>] = <span class="num">2</span>       <span class="cm"># 风控 2 轮</span>
+
+<span class="cm"># === 第 2 步：定义候选股票池 ===</span>
+<span class="cm"># 你可以替换为你自己关注的 A 股股票</span>
+candidates = {
+    <span class="str">"600519.SS"</span>: <span class="str">"贵州茅台"</span>,
+    <span class="str">"000858.SZ"</span>: <span class="str">"五粮液"</span>,
+    <span class="str">"601318.SS"</span>: <span class="str">"中国平安"</span>,
+    <span class="str">"000333.SZ"</span>: <span class="str">"美的集团"</span>,
+    <span class="str">"600036.SS"</span>: <span class="str">"招商银行"</span>,
+    <span class="str">"002594.SZ"</span>: <span class="str">"比亚迪"</span>,
+    <span class="str">"300750.SZ"</span>: <span class="str">"宁德时代"</span>,
+    <span class="str">"601012.SS"</span>: <span class="str">"隆基绿能"</span>,
+    <span class="str">"000001.SZ"</span>: <span class="str">"平安银行"</span>,
+    <span class="str">"600276.SS"</span>: <span class="str">"恒瑞医药"</span>,
+}
+
+<span class="cm"># === 第 3 步：评级排序权重（从最看多到最看空）===</span>
+rating_score = {
+    <span class="str">"Buy"</span>: <span class="num">5</span>,
+    <span class="str">"Overweight"</span>: <span class="num">4</span>,
+    <span class="str">"Hold"</span>: <span class="num">3</span>,
+    <span class="str">"Underweight"</span>: <span class="num">2</span>,
+    <span class="str">"Sell"</span>: <span class="num">1</span>,
+    <span class="str">"REVIEW"</span>: <span class="num">0</span>,  <span class="cm"># 无法解析，排最后</span>
+}
+
+<span class="cm"># === 第 4 步：初始化分析引擎 ===</span>
+today = date.today().strftime(<span class="str">"%Y-%m-%d"</span>)
+ta = TradingAgentsGraph(debug=<span class="kw">False</span>, config=config)
+
+results = []
+
+<span class="kw">for</span> ticker, name <span class="kw">in</span> candidates.items():
+    <span class="fn">print</span>(f<span class="str">"\n{'='*50}"</span>)
+    <span class="fn">print</span>(f<span class="str">"正在分析: {name} ({ticker})"</span>)
+    <span class="fn">print</span>(f<span class="str">"{'='*50}"</span>)
+
+    <span class="kw">try</span>:
+        state, signal = ta.propagate(ticker, today)
+
+        <span class="cm"># 提取评级</span>
+        rating = signal  <span class="cm"># 已经是 5 级评级字符串</span>
+        score = rating_score.get(rating, <span class="num">0</span>)
+
+        <span class="cm"># 提取交易决策文本</span>
+        decision = state.get(<span class="str">"final_trade_decision"</span>, <span class="str">""</span>)
+
+        results.append({
+            <span class="str">"ticker"</span>: ticker,
+            <span class="str">"name"</span>: name,
+            <span class="str">"rating"</span>: rating,
+            <span class="str">"score"</span>: score,
+            <span class="str">"decision"</span>: decision,
+        })
+
+        <span class="fn">print</span>(f<span class="str">"  评级: {rating} (得分: {score})"</span>)
+
+    <span class="kw">except</span> Exception <span class="kw">as</span> e:
+        <span class="fn">print</span>(f<span class="str">"  分析失败: {e}"</span>)
+        results.append({
+            <span class="str">"ticker"</span>: ticker, <span class="str">"name"</span>: name,
+            <span class="str">"rating"</span>: <span class="str">"ERROR"</span>, <span class="str">"score"</span>: <span class="num">-1</span>,
+            <span class="str">"decision"</span>: str(e),
+        })
+
+<span class="cm"># === 第 5 步：排序并输出 Top 3 ===</span>
+results.sort(key=<span class="kw">lambda</span> x: x[<span class="str">"score"</span>], reverse=<span class="kw">True</span>)
+
+<span class="fn">print</span>(f<span class="str">"\n{'#'*60}"</span>)
+<span class="fn">print</span>(<span class="str">"# 分析结果排名（从最推荐到最不推荐）"</span>)
+<span class="fn">print</span>(f<span class="str">"{'#'*60}"</span>)
+
+<span class="kw">for</span> i, r <span class="kw">in</span> enumerate(results, <span class="num">1</span>):
+    marker = <span class="str">"  ⭐ TOP 3 推荐买入"</span> <span class="kw">if</span> i <= <span class="num">3</span> <span class="kw">else</span> <span class="str">""</span>
+    <span class="fn">print</span>(f<span class="str">"  {i}. {r['name']} ({r['ticker']}) → {r['rating']}{marker}"</span>)
+
+<span class="cm"># === 第 6 步：保存 Top 3 的详细报告 ===</span>
+top3 = results[:<span class="num">3</span>]
+<span class="kw">for</span> r <span class="kw">in</span> top3:
+    ta.save_reports(
+        {<span class="str">"company_of_interest"</span>: r[<span class="str">"ticker"</span>], **{
+            k: v <span class="kw">for</span> k, v <span class="kw">in</span> {
+                <span class="str">"market_report"</span>: <span class="str">""</span>, <span class="str">"sentiment_report"</span>: <span class="str">""</span>,
+                <span class="str">"news_report"</span>: <span class="str">""</span>, <span class="str">"fundamentals_report"</span>: <span class="str">""</span>,
+                <span class="str">"investment_debate_state"</span>: {}, <span class="str">"investment_plan"</span>: <span class="str">""</span>,
+                <span class="str">"trader_investment_plan"</span>: <span class="str">""</span>, <span class="str">"risk_debate_state"</span>: {},
+                <span class="str">"final_trade_decision"</span>: r[<span class="str">"decision"</span>],
+                <span class="str">"final_rating"</span>: r[<span class="str">"rating"</span>],
+            }.items() <span class="kw">if</span> v
+        }},
+        r[<span class="str">"ticker"</span>],
+    )
+    <span class="fn">print</span>(f<span class="str">"\n  {r['name']} 报告已保存"</span>)
+    <span class="fn">print</span>(f<span class="str">"  决策摘要: {r['decision'][:200]}..."</span>)
+    </div>
+  </div>
+
+  <div class="annotation">
+    <div class="label">脚本说明</div>
+    <p><strong>第 1 步</strong>：复制默认配置，设置中文输出和辩论轮数。</p>
+    <p><strong>第 2 步</strong>：定义候选股票池。你可以自由替换为你关注的 A 股。</p>
+    <p><strong>第 3 步</strong>：定义评级权重，Buy=5 分最高，Sell=1 分最低。</p>
+    <p><strong>第 4 步</strong>：遍历每只股票调用 <code>propagate()</code>，收集评级和决策文本。</p>
+    <p><strong>第 5 步</strong>：按评分排序，输出排名。</p>
+    <p><strong>第 6 步</strong>：保存 Top 3 的详细报告。</p>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">PowerShell</span> 运行脚本</div>
+    <div class="code-body">
+<span class="cm"># 确保虚拟环境已激活</span>
+<span class="fn">.\.venv\Scripts\activate.bat</span>
+
+<span class="cm"># 运行批量分析脚本</span>
+<span class="fn">python</span> analyze_astocks.py
+
+<span class="cm"># 预计运行时间：每只股票 3-5 分钟，10 只约 30-50 分钟</span>
+    </div>
+  </div>
+
+  <div class="tip">
+    <div class="tip-label">省钱技巧</div>
+    <p>如果不想分析 10 只股票，可以先把候选池缩小到 5 只。或者用 <code>config["max_debate_rounds"] = 1</code> 和 <code>config["max_risk_discuss_rounds"] = 1</code> 减少 LLM 调用次数。</p>
+  </div>
+</div>
+
+<!-- ==================== STEP 5 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">5</div>
+    <h2>解读结果：如何确定卖出点位</h2>
+    <span class="time">约 10 分钟</span>
+  </div>
+
+  <div class="concept">
+    <h4>系统能给你什么？</h4>
+    <ul>
+      <li><strong>5 级评级</strong>：Buy / Overweight / Hold / Underweight / Sell</li>
+      <li><strong>交易决策文本</strong>：AI 写的完整分析报告，包含买入理由</li>
+      <li><strong>技术分析报告</strong>：包含 RSI、MACD、布林带等指标的具体数值</li>
+      <li><strong>基本面报告</strong>：财务数据、估值指标</li>
+    </ul>
+  </div>
+
+  <div class="concept">
+    <h4>系统不能直接给你什么？</h4>
+    <ul>
+      <li><strong>具体的目标价格</strong>（如"涨到 1800 元卖出"）</li>
+      <li><strong>止损价位</strong>（如"跌到 1500 元止损"）</li>
+      <li>这些需要你根据技术分析报告中的指标自行判断</li>
+    </ul>
+  </div>
+
+  <h3>5.1 从技术分析师报告中提取卖出信号</h3>
+  <p>每只股票的分析报告中，<strong>Market Analyst（技术分析师）</strong>的报告包含关键的技术指标。打开保存的 HTML 报告，找到 "Market Report" 部分，关注以下指标：</p>
+
+  <table class="info-table">
+    <tr><th>指标</th><th>卖出信号</th><th>具体判断</th></tr>
+    <tr><td><strong>RSI（相对强弱指数）</strong></td><td>RSI > 70</td><td>超买区域，股价可能回调，考虑卖出</td></tr>
+    <tr><td><strong>MACD</strong></td><td>MACD 线下穿信号线（死叉）</td><td>短期趋势转弱，卖出信号</td></tr>
+    <tr><td><strong>布林带上轨</strong></td><td>股价触及或突破上轨</td><td>短期超买，可能回落</td></tr>
+    <tr><td><strong>均线系统</strong></td><td>股价跌破 20 日/60 日均线</td><td>中期趋势转弱</td></tr>
+    <tr><td><strong>成交量</strong></td><td>放量下跌</td><td>卖压增大，考虑止损</td></tr>
+  </table>
+
+  <h3>5.2 从交易决策文本中提取关键信息</h3>
+  <p>打开报告的 "Final Trade Decision" 部分，AI 通常会写类似这样的内容：</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang">示例</span> AI 决策文本（示意）</div>
+    <div class="code-body">
+<span class="str">Rating: Buy
+
+贵州茅台当前技术面显示 RSI 为 45（中性偏强），
+MACD 刚刚形成金叉，短期动能向上。
+基本面方面，最新财报显示营收同比增长 15%，
+净利润率维持在 50% 以上，估值合理。
+
+建议在当前价位附近建仓，关注 1800 元附近的
+前期高点阻力位。若突破 1800 元，上方空间
+看向 1950-2000 元区间。
+
+止损建议设在 60 日均线（约 1550 元）下方。</span>
+    </div>
+  </div>
+
+  <div class="annotation">
+    <div class="label">如何读这段文本</div>
+    <p><strong>买入理由</strong>：RSI 45（不超买）、MACD 金叉（趋势向上）、基本面好。</p>
+    <p><strong>阻力位/目标位</strong>：1800 元（前期高点），突破后看 1950-2000 元。</p>
+    <p><strong>止损位</strong>：1550 元（60 日均线下方）。</p>
+    <p>注意：这些价格是 AI 根据当前数据估算的，<strong>不是保证</strong>，实际走势可能完全不同。</p>
+  </div>
+
+  <h3>5.3 制定卖出策略的 3 种方法</h3>
+
+  <table class="info-table">
+    <tr><th>方法</th><th>操作</th><th>适合场景</th></tr>
+    <tr><td><strong>目标价卖出</strong></td><td>AI 报告中提到的阻力位/目标位，到达后卖出</td><td>短线交易</td></tr>
+    <tr><td><strong>技术指标卖出</strong></td><td>RSI > 70 或 MACD 死叉时卖出</td><td>趋势交易</td></tr>
+    <tr><td><strong>止损卖出</strong></td><td>跌破 AI 提到的支撑位（如 60 日均线）时卖出</td><td>风险控制</td></tr>
+  </table>
+
+  <div class="warn-banner" style="margin-top: 16px;">
+    <h3>再次提醒</h3>
+    <p>AI 给出的价格参考<strong>不是投资建议</strong>。A 股有涨跌停限制（±10%），且受政策影响大。请结合自身风险承受能力，必要时咨询持牌投资顾问。</p>
+  </div>
+</div>
+
+<!-- ==================== STEP 6 ==================== -->
+<div class="step">
+  <div class="step-header">
+    <div class="step-num">6</div>
+    <h2>完整操作流程总结</h2>
+    <span class="time">一次性操作</span>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">从零到选出 3 只股票的完整流程</div>
+    <div class="flow-row">
+      <div class="flow-node blue">安装 Python 3.11+</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node blue">git clone 项目</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node blue">pip install .</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node green">创建 .env 文件</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node green">填入 LLM API Key</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node green">设置 OUTPUT_LANGUAGE=Chinese</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node orange">准备候选 A 股列表</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node orange">用 .SS/.SZ 后缀</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node orange">10 只左右蓝筹股</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node purple">运行 analyze_astocks.py</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node purple">等待 30-50 分钟</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node yellow">查看排名结果</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node yellow">选出 Top 3（评级最高的）</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node red">打开 HTML 报告</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node red">读 Market Report 技术指标</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node red">读 Final Decision 找目标价/止损位</div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node green" style="border-style:dashed;">制定买入计划 + 卖出策略</div>
+    </div>
+  </div>
+
+  <h3>6.1 快速命令速查</h3>
+  <table class="info-table">
+    <tr><th>操作</th><th>命令</th></tr>
+    <tr><td>激活环境</td><td><code>.\.venv\Scripts\activate.bat</code></td></tr>
+    <tr><td><strong>退回上级目录</strong></td><td><code>cd ..</code>（必须！否则 CLI 命令无法识别）</td></tr>
+    <tr><td><strong>内置选股器（推荐）</strong></td><td><code>tradingagents screener --top 3</code></td></tr>
+    <tr><td>交互式分析一只股票</td><td><code>tradingagents --ticker 600519.SS --date 2026-11-06 --save</code></td></tr>
+    <tr><td>批量分析（脚本）</td><td><code>python analyze_astocks.py</code></td></tr>
+    <tr><td>查看选股器报告</td><td>打开 <code>~/.tradingagents/logs/screener/&lt;date&gt;/</code> 下的文件</td></tr>
+    <tr><td>查看分析报告</td><td>打开 <code>~/.tradingagents/logs/reports/</code> 下的 HTML 文件</td></tr>
+    <tr><td>查看记忆日志</td><td><code>type ~/.tradingagents/memory/trading_memory.md</code></td></tr>
+    <tr><td>换 DeepSeek（便宜）</td><td>改 .env：<code>TRADINGAGENTS_LLM_PROVIDER=deepseek</code></td></tr>
+    <tr><td>用本地 Ollama（免费）</td><td>改 .env：<code>TRADINGAGENTS_LLM_PROVIDER=ollama</code>，然后 <code>ollama pull qwen2.5</code></td></tr>
+  </table>
+</div>
+
+</div>
+
+<div class="footer">
+  TradingAgents v0.7.1 · A股实战指南 · 2026-11-06<br>
+  本项目仅供研究，不构成投资建议。投资有风险，入市需谨慎。<br>
+  <small style="color:var(--teal);">内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
+</div>
+
+</body>
+</html>

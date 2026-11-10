@@ -44,6 +44,18 @@ def _seven_days_back(trade_date: str) -> str:
     return (datetime.strptime(trade_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
 
+# StockTwits indexes cashtags for US and crypto tickers, and the English
+# finance subreddits mention a China-listed name incidentally at best. Neither
+# is a source for an A-share, so asking them spent an offshore socket timeout
+# (and a TypeSafe screening call) on every China-listed analysis.
+_CHINA_SUFFIXES = (".SS", ".SZ")
+
+
+def _china_listed(ticker: str) -> bool:
+    """Whether the symbol is listed in mainland China."""
+    return ticker.upper().endswith(_CHINA_SUFFIXES)
+
+
 def create_sentiment_analyst(llm):
     """Create a sentiment analyst node for the trading graph.
 
@@ -66,14 +78,25 @@ def create_sentiment_analyst(llm):
         news_block = get_news.func(ticker, start_date, end_date)
         # Pass the analysis window so a historical run trims social posts to it
         # instead of leaking today's chatter into a backtest (#1220).
-        screen = jev_screen(ticker)
-        stocktwits_block = fetch_stocktwits_messages(
-            ticker, limit=30, start_date=start_date, end_date=end_date, screen=screen
-        )
-        subreddits = subreddits_for(ticker)
-        reddit_block = fetch_reddit_posts(
-            ticker, subreddits, start_date=start_date, end_date=end_date, screen=screen
-        )
+        if _china_listed(ticker):
+            stocktwits_block = (
+                "<StockTwits does not index China-listed A-shares; no retail "
+                "cashtag sentiment is available for this symbol>"
+            )
+            reddit_block = (
+                "<Reddit finance subreddits do not cover China-listed A-shares; "
+                "no community sentiment is available for this symbol>"
+            )
+            subreddits: tuple[str, ...] = ()
+        else:
+            screen = jev_screen(ticker)
+            stocktwits_block = fetch_stocktwits_messages(
+                ticker, limit=30, start_date=start_date, end_date=end_date, screen=screen
+            )
+            subreddits = subreddits_for(ticker)
+            reddit_block = fetch_reddit_posts(
+                ticker, subreddits, start_date=start_date, end_date=end_date, screen=screen
+            )
 
         system_message = _build_system_message(
             ticker=ticker,
@@ -138,12 +161,22 @@ def _build_system_message(
     subreddits: tuple[str, ...] = DEFAULT_SUBREDDITS,
 ) -> str:
     """Assemble the sentiment-analyst system message with structured data blocks."""
-    if subreddits == DEFAULT_SUBREDDITS:
+    if not subreddits:
+        # A listing the social sources do not cover (China A-shares): the read
+        # rests on news, and saying so beats describing a community that is not
+        # there.
+        character = "neither social source indexes this listing, so the read rests on news alone"
+    elif subreddits == DEFAULT_SUBREDDITS:
         character = "r/wallstreetbets is often contrarian/exuberant; r/stocks more measured; r/investing longer-term"
     elif len(subreddits) > len(CRYPTO_SUBREDDITS):
         character = f"r/{subreddits[0]} leans toward the coin's holders; r/CryptoCurrency and r/CryptoMarkets are broader"
     else:
         character = "r/CryptoCurrency and r/CryptoMarkets are broad crypto communities"
+    reddit_scope = (
+        ", ".join(f"r/{sub}" for sub in subreddits)
+        if subreddits
+        else "not covered for this listing"
+    )
     return f"""You are a financial market sentiment analyst. Your task is to produce a comprehensive sentiment report for {ticker} covering the period from {start_date} to {end_date}, drawing on three complementary data sources that have already been collected for you.
 
 ## Data sources (pre-fetched, in this prompt)
@@ -162,7 +195,7 @@ Fast-moving signal. Each message carries a user-labeled sentiment tag (Bullish /
 {stocktwits_block}
 <end_of_stocktwits>
 
-### Reddit posts — {", ".join(f"r/{sub}" for sub in subreddits)} (past 7 days)
+### Reddit posts — {reddit_scope} (past 7 days)
 Community discussion, without vote or comment counts. Subreddit character matters ({character}).
 
 <start_of_reddit>

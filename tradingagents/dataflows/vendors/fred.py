@@ -14,8 +14,16 @@ from datetime import datetime, timedelta
 
 import pytz
 
-from tradingagents.dataflows.errors import VendorNotConfiguredError
-from tradingagents.dataflows.net import get_scrubbed
+from tradingagents.dataflows.errors import VendorNotConfiguredError, VendorUnavailableError
+from tradingagents.dataflows.net import (
+    DEFAULT_TIMEOUT,
+    block_host,
+    blocked_notice,
+    clear_host_block,
+    get_scrubbed,
+    is_connect_level_failure,
+    is_host_blocked,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +35,10 @@ FRED_API_BASE = "https://api.stlouisfed.org/fred"
 # bundles its own tz database, so this works where system tzdata is absent.
 FRED_TZ = pytz.timezone("America/Chicago")
 
-# Network timeout (seconds) so a stalled request can't hang the agents,
-# mirroring the Alpha Vantage client.
-REQUEST_TIMEOUT = 30
+# Fail fast on a host this network cannot reach, but keep a generous read
+# budget: FRED builds long vintage tables and a slow-but-live reply is worth
+# waiting for. Mirrors the Alpha Vantage client.
+REQUEST_TIMEOUT = DEFAULT_TIMEOUT
 
 # Default trailing window when the caller does not specify one. A year captures
 # the trend and the year-over-year base for most monthly/quarterly series.
@@ -146,13 +155,24 @@ def _fred_today() -> str:
 def _request(path: str, params: dict) -> dict:
     """GET a FRED endpoint, surfacing FRED's JSON error body on a bad request."""
     api_key = get_api_key()
-    response = get_scrubbed(
-        f"{FRED_API_BASE}/{path}",
-        params={**params, "api_key": api_key, "file_type": "json"},
-        timeout=REQUEST_TIMEOUT,
-        secret=api_key,
-        passthrough=(400,),
-    )
+    url = f"{FRED_API_BASE}/{path}"
+    if is_host_blocked(url):
+        # Already logged when the host was parked; a warning per indicator
+        # would put back the noise this check exists to remove.
+        raise VendorUnavailableError(blocked_notice(url))
+    try:
+        response = get_scrubbed(
+            url,
+            params={**params, "api_key": api_key, "file_type": "json"},
+            timeout=REQUEST_TIMEOUT,
+            secret=api_key,
+            passthrough=(400,),
+        )
+    except Exception as exc:
+        if is_connect_level_failure(exc):
+            block_host(url, type(exc).__name__)
+        raise
+    clear_host_block(url)
     # FRED returns 400 with a JSON {"error_message": ...} for unknown series IDs
     # or malformed params; turn that into a clear, actionable error.
     if response.status_code == 400:

@@ -117,6 +117,38 @@ def _dummy_api_keys(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_host_blocks():
+    """Clear the unreachable-host parking before and after each test.
+
+    A connect-level failure parks its host for the rest of the run, and the
+    socket refusal above makes every un-mocked request fail exactly that way.
+    Without this, the first test to touch a vendor would park its host and any
+    later test would exercise the skip path instead of the request it mocks.
+    """
+    from tradingagents.dataflows import net
+
+    net.reset_host_blocks()
+    yield
+    net.reset_host_blocks()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_quote_cache():
+    """Drop parsed option boards before and after each test.
+
+    The option vendor keeps a strike ladder for the day so a batch of analyses
+    reads one chain instead of one per stock. Left standing, the first test to
+    call it would decide what every later test sees, and a mocked board would
+    never be requested again.
+    """
+    from tradingagents.dataflows.vendors import sse_option
+
+    sse_option.reset_quote_cache()
+    yield
+    sse_option.reset_quote_cache()
+
+
+@pytest.fixture(autouse=True)
 def _isolate_config():
     """Reset the global dataflows config before and after each test.
 

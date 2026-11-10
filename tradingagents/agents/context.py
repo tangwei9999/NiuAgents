@@ -82,9 +82,40 @@ def resolve_instrument_identity(ticker: str) -> dict:
         return {}
 
 
+def _china_identity(ticker: str) -> dict:
+    """Identity for a China-listed ticker via AKShare, never via yfinance.
+
+    Mirrors ``_identity``'s contract: raises on failure so
+    :func:`resolve_instrument_identity` can fail open.
+    """
+    import akshare as ak
+
+    code = ticker.split(".")[0].zfill(6)
+    info = ak.stock_individual_info_em(symbol=code)
+    if info is None or info.empty:
+        raise ValueError(f"No AKShare profile rows for {ticker}")
+
+    fields: dict[str, str] = {}
+    for _, row in info.iterrows():
+        key = str(row.iloc[0]).strip()
+        if key:
+            fields[key] = str(row.iloc[1]).strip()
+
+    identity: dict[str, str] = {}
+    company_name = _clean_identity_value(fields.get("股票简称"))
+    if company_name:
+        identity["company_name"] = company_name
+    industry = _clean_identity_value(fields.get("行业"))
+    if industry:
+        identity["industry"] = industry
+    return identity
+
+
 @functools.lru_cache(maxsize=256)
 def _identity(ticker: str) -> dict:
     """The vendor's identity fields for ``ticker``; raises if the lookup fails."""
+    if ticker.upper().endswith((".SS", ".SZ")):
+        return _china_identity(ticker)
     info = get_company_profile(ticker)
     identity: dict[str, str] = {}
     company_name = _clean_identity_value(info.get("longName")) or _clean_identity_value(

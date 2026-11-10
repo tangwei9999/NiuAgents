@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents 傻瓜式学习指南</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --green: #4ade80; --orange: #fb923c; --pink: #f472b6;
+    --purple: #a78bfa; --yellow: #fbbf24; --red: #f87171;
+    --teal: #2dd4bf; --code-bg: #0d1117;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif; line-height: 1.8; }
+
+  .header { text-align: center; padding: 48px 20px 24px; }
+  .header h1 { font-size: 2.2rem; background: linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header p { color: var(--muted); margin-top: 8px; font-size: 1rem; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* ===== Phase ===== */
+  .phase { margin-bottom: 48px; }
+  .phase-title { font-size: 1.5rem; font-weight: 800; padding: 12px 20px; border-radius: 10px 10px 0 0; display: flex; align-items: center; gap: 12px; }
+  .phase-title .num { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; color: var(--bg); flex-shrink: 0; }
+  .phase-body { background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; padding: 24px; }
+
+  .p1 .phase-title { background: rgba(56,189,248,.12); color: var(--accent); } .p1 .num { background: var(--accent); }
+  .p2 .phase-title { background: rgba(74,222,128,.12); color: var(--green); } .p2 .num { background: var(--green); }
+  .p3 .phase-title { background: rgba(251,146,60,.12); color: var(--orange); } .p3 .num { background: var(--orange); }
+  .p4 .phase-title { background: rgba(167,139,250,.12); color: var(--purple); } .p4 .num { background: var(--purple); }
+  .p5 .phase-title { background: rgba(244,114,182,.12); color: var(--pink); } .p5 .num { background: var(--pink); }
+  .p6 .phase-title { background: rgba(251,191,36,.12); color: var(--yellow); } .p6 .num { background: var(--yellow); }
+
+  /* ===== Step ===== */
+  .step { margin-bottom: 32px; padding-bottom: 32px; border-bottom: 1px solid var(--border); }
+  .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .step h3 { font-size: 1.15rem; color: var(--accent); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .step h3 .step-num { background: rgba(56,189,248,.15); color: var(--accent); padding: 2px 10px; border-radius: 12px; font-size: .8rem; }
+  .step p { font-size: .92rem; color: var(--muted); margin-bottom: 12px; }
+  .step strong { color: var(--text); }
+
+  /* Concept Box */
+  .concept { background: rgba(56,189,248,.06); border: 1px solid rgba(56,189,248,.2); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .concept h4 { color: var(--accent); font-size: .9rem; margin-bottom: 8px; }
+  .concept p, .concept li { font-size: .85rem; color: var(--muted); }
+  .concept ul { padding-left: 20px; }
+  .concept li { margin-bottom: 4px; }
+
+  /* Code Block */
+  .code-block { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; }
+  .code-header { background: var(--surface2); padding: 8px 16px; font-size: .78rem; color: var(--muted); font-family: 'Cascadia Code', 'Fira Code', monospace; display: flex; justify-content: space-between; align-items: center; }
+  .code-header .lang { color: var(--accent); font-weight: 600; }
+  .code-body { padding: 16px; overflow-x: auto; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .82rem; line-height: 1.7; }
+  .code-body .line { display: block; }
+  .code-body .ln { color: #4a5568; user-select: none; margin-right: 16px; display: inline-block; min-width: 24px; text-align: right; }
+  .code-body .kw { color: #c678dd; }
+  .code-body .fn { color: #61afef; }
+  .code-body .str { color: #98c379; }
+  .code-body .cm { color: #5c6370; font-style: italic; }
+  .code-body .num { color: #d19a66; }
+  .code-body .op { color: #56b6c2; }
+  .code-body .var { color: #e06c75; }
+  .code-body .dec { color: #e5c07b; }
+
+  /* Annotation */
+  .annotation { background: rgba(251,191,36,.06); border-left: 3px solid var(--yellow); padding: 12px 16px; margin: 8px 0 16px; border-radius: 0 8px 8px 0; }
+  .annotation p { font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
+  .annotation .label { color: var(--yellow); font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Flow Diagram */
+  .flow { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin: 16px 0; overflow-x: auto; }
+  .flow-title { font-size: .85rem; color: var(--teal); font-weight: 700; margin-bottom: 12px; text-align: center; }
+  .flow-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .flow-node { padding: 8px 16px; border-radius: 8px; font-size: .8rem; font-weight: 600; text-align: center; border: 2px solid; white-space: nowrap; }
+  .flow-node.blue { background: rgba(56,189,248,.1); border-color: var(--accent); color: var(--accent); }
+  .flow-node.green { background: rgba(74,222,128,.1); border-color: var(--green); color: var(--green); }
+  .flow-node.orange { background: rgba(251,146,60,.1); border-color: var(--orange); color: var(--orange); }
+  .flow-node.purple { background: rgba(167,139,250,.1); border-color: var(--purple); color: var(--purple); }
+  .flow-node.pink { background: rgba(244,114,182,.1); border-color: var(--pink); color: var(--pink); }
+  .flow-node.yellow { background: rgba(251,191,36,.1); border-color: var(--yellow); color: var(--yellow); }
+  .flow-node.red { background: rgba(248,113,113,.1); border-color: var(--red); color: var(--red); }
+  .flow-arrow { color: var(--muted); font-size: 1.1rem; }
+  .flow-arrow-down { text-align: center; color: var(--muted); font-size: 1rem; margin: 4px 0; }
+
+  /* Tip Box */
+  .tip { background: rgba(74,222,128,.06); border: 1px solid rgba(74,222,128,.2); border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .tip .tip-label { color: var(--green); font-weight: 700; font-size: .8rem; }
+  .tip p { font-size: .85rem; color: var(--muted); }
+
+  /* Warning Box */
+  .warn { background: rgba(248,113,113,.06); border: 1px solid rgba(248,113,113,.2); border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .warn .warn-label { color: var(--red); font-weight: 700; font-size: .8rem; }
+  .warn p { font-size: .85rem; color: var(--muted); }
+
+  /* Table */
+  .info-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: .85rem; }
+  .info-table th { text-align: left; padding: 8px 12px; background: rgba(56,189,248,.08); color: var(--accent); border-bottom: 2px solid var(--border); font-weight: 600; }
+  .info-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); }
+
+  .footer { text-align: center; padding: 40px 20px; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.5rem; }
+    .code-body { font-size: .72rem; }
+    .flow-node { font-size: .7rem; padding: 6px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TradingAgents 傻瓜式学习指南</h1>
+  <p>从零开始，逐行代码解释，配流程图，小白也能看懂</p>
+</div>
+
+<div class="container">
+
+<!-- ==================== PHASE 1 ==================== -->
+<div class="phase p1">
+  <div class="phase-title"><div class="num">1</div> 环境搭建 & 第一次运行</div>
+  <div class="phase-body">
+
+    <!-- Step 1.1 -->
+    <div class="step">
+      <h3><span class="step-num">1.1</span> 先看 main.py —— 整个程序的最小入口</h3>
+      <p>打开项目根目录下的 <strong>main.py</strong> 文件，它只有 <strong>17 行代码</strong>，但它是理解整个项目的钥匙。我们逐行解释：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> main.py</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">from</span> tradingagents.default_config <span class="kw">import</span> DEFAULT_CONFIG</span>
+<span class="line"><span class="ln">2</span><span class="kw">from</span> tradingagents.graph.trading_graph <span class="kw">import</span> TradingAgentsGraph</span>
+<span class="line"><span class="ln">3</span></span>
+<span class="line"><span class="ln">4</span><span class="cm"># DEFAULT_CONFIG 已经包含了 TRADINGAGENTS_* 环境变量的覆盖</span></span>
+<span class="line"><span class="ln">5</span><span class="cm"># 所以用户可以通过 .env 文件切换模型，不需要改代码</span></span>
+<span class="line"><span class="ln">6</span>config = DEFAULT_CONFIG.<span class="fn">copy</span>()</span>
+<span class="line"><span class="ln">7</span></span>
+<span class="line"><span class="ln">8</span><span class="cm"># 用自定义配置初始化</span></span>
+<span class="line"><span class="ln">9</span>ta = TradingAgentsGraph(debug=<span class="kw">True</span>, config=config)</span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span><span class="cm"># 正向传播（执行分析）</span></span>
+<span class="line"><span class="ln">12</span>_, decision = ta.<span class="fn">propagate</span>(<span class="str">"NVDA"</span>, <span class="str">"2026-09-01"</span>)</span>
+<span class="line"><span class="ln">13</span><span class="fn">print</span>(decision)</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">逐行解释</div>
+        <p><strong>第 1 行</strong>：从 <code>tradingagents</code> 包中导入 <code>DEFAULT_CONFIG</code>。这是一个 Python 字典（你可以理解为"配置表"），里面存了所有默认设置，比如用哪个 AI 模型、辩论几轮、数据从哪来等。</p>
+        <p><strong>第 2 行</strong>：导入 <code>TradingAgentsGraph</code> 类。这是整个项目的"总指挥"，负责协调所有 AI 智能体一起工作。</p>
+        <p><strong>第 6 行</strong>：<code>DEFAULT_CONFIG.copy()</code> 把默认配置复制一份。用 <code>.copy()</code> 是为了不修改原始配置（就像复印一份文件再在上面写字，原件不动）。</p>
+        <p><strong>第 9 行</strong>：创建 <code>TradingAgentsGraph</code> 对象。<code>debug=True</code> 表示开启调试模式，会在控制台打印每一步的详细信息。<code>config=config</code> 把刚才的配置传进去。</p>
+        <p><strong>第 12 行</strong>：<code>ta.propagate("NVDA", "2026-09-01")</code> 是核心调用！意思是"请分析 NVDA（英伟达）这只股票，分析日期是 2026-09-01"。返回两个值：<code>_</code>（完整状态，我们暂时不要）和 <code>decision</code>（最终决策，比如 "Buy" 或 "Sell"）。</p>
+        <p><strong>第 13 行</strong>：打印最终决策结果。</p>
+      </div>
+
+      <div class="concept">
+        <h4>什么是 propagate()？</h4>
+        <p><code>propagate()</code> 是 <code>TradingAgentsGraph</code> 类的一个方法，意思是"向前传播/执行"。你可以把它理解为"启动整个分析流水线"。</p>
+        <p>它接收 3 个参数：</p>
+        <ul>
+          <li><code>company_name</code>（必填）：股票代码，如 <code>"NVDA"</code>、<code>"AAPL"</code>、<code>"0700.HK"</code>（港股腾讯）</li>
+          <li><code>trade_date</code>（必填）：分析日期，格式 <code>"YYYY-MM-DD"</code>，不能是未来的日期</li>
+          <li><code>asset_type</code>（可选）：资产类型，默认 <code>"stock"</code>（股票），加密货币用 <code>"crypto"</code></li>
+        </ul>
+        <p>它返回一个元组 <code>(final_state, signal)</code>：</p>
+        <ul>
+          <li><code>final_state</code>：包含所有分析师报告、辩论记录、最终决策的完整字典</li>
+          <li><code>signal</code>：5 级评级之一 —— <code>Buy</code> / <code>Overweight</code> / <code>Hold</code> / <code>Underweight</code> / <code>Sell</code>，或 <code>REVIEW</code>（无法解析）</li>
+        </ul>
+      </div>
+
+      <div class="flow">
+        <div class="flow-title">propagate() 内部执行流程图</div>
+        <div class="flow-row">
+          <div class="flow-node blue">验证日期格式</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node blue">解析公司身份</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node blue">创建初始状态</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">分析师并行工作</div>
+          <div class="flow-arrow">+</div>
+          <div class="flow-node yellow">Memory Log 结算历史</div>
+        </div>
+        <div class="flow-arrow-down">▼ 全部完成后</div>
+        <div class="flow-row">
+          <div class="flow-node orange">多空辩论</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node purple">研究经理综合</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">交易员提案</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node pink">风控三方辩论</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node purple">组合经理审批</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node yellow">输出 5 级评级</div>
+        </div>
+      </div>
+
+      <div class="tip">
+        <div class="tip-label">动手试试</div>
+        <p>在终端中运行：<code>python main.py</code>。你会看到控制台输出大量日志，每个智能体在做什么都会打印出来。最后会输出类似 <code>Buy</code> 或 <code>Overweight</code> 的结果。</p>
+      </div>
+    </div>
+
+    <!-- Step 1.2 -->
+    <div class="step">
+      <h3><span class="step-num">1.2</span> 理解 .env 配置 —— 不改代码就能换模型</h3>
+      <p>项目根目录有一个 <code>.env.example</code> 文件，复制一份改名为 <code>.env</code>，然后填入你的 API Key：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Bash</span> 终端命令</div>
+        <div class="code-body">
+<span class="line"><span class="cm"># Windows PowerShell</span></span>
+<span class="line"><span class="fn">cp</span> .env.example .env</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 然后用记事本打开 .env，填入：</span></span>
+<span class="line">OPENAI_API_KEY=sk-你的密钥</span>
+<span class="line">TRADINGAGENTS_LLM_PROVIDER=openai</span>
+<span class="line">TRADINGAGENTS_QUICK_THINK_LLM=gpt-6-luna</span>
+<span class="line">TRADINGAGENTS_DEEP_THINK_LLM=gpt-6-sol</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">关键概念</div>
+        <p><strong>.env 文件</strong>是一个"环境变量文件"，用来存放密钥和配置。程序启动时会自动读取它，这样你就不用把密钥写在代码里（更安全）。</p>
+        <p><strong>TRADINGAGENTS_ 前缀</strong>：所有以这个前缀开头的环境变量，都会被自动读取并覆盖默认配置。比如 <code>TRADINGAGENTS_LLM_PROVIDER=openai</code> 会把配置中的 <code>llm_provider</code> 改成 <code>openai</code>。</p>
+      </div>
+
+      <div class="concept">
+        <h4>配置加载的 3 层优先级（从低到高）</h4>
+        <table class="info-table">
+          <tr><th>层级</th><th>来源</th><th>例子</th><th>说明</th></tr>
+          <tr><td>1（最低）</td><td>代码硬编码</td><td><code>"llm_provider": "openai"</code></td><td>写在 default_config.py 里的默认值</td></tr>
+          <tr><td>2</td><td>.env 环境变量</td><td><code>TRADINGAGENTS_LLM_PROVIDER=google</code></td><td>自动覆盖第 1 层</td></tr>
+          <tr><td>3（最高）</td><td>运行时 config dict</td><td><code>config["llm_provider"] = "anthropic"</code></td><td>代码中直接修改，覆盖一切</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== PHASE 2 ==================== -->
+<div class="phase p2">
+  <div class="phase-title"><div class="num">2</div> 配置体系 & 数据路由</div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">2.1</span> 深入理解 default_config.py —— 所有配置的"总表"</h3>
+      <p>这个文件定义了项目的<strong>所有默认配置</strong>。我们挑最重要的几个字段解释：</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> default_config.py（关键片段）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">build_default_config</span>() -> dict:</span>
+<span class="line"><span class="ln">2</span>    <span class="kw">return</span> _apply_env_overrides({</span>
+<span class="line"><span class="ln">3</span>        <span class="str">"llm_provider"</span>: <span class="str">"openai"</span>,          <span class="cm"># 用哪个 AI 公司</span></span>
+<span class="line"><span class="ln">4</span>        <span class="str">"deep_think_llm"</span>: <span class="str">"gpt-6-sol"</span>,    <span class="cm"># 深度思考模型（经理层用）</span></span>
+<span class="line"><span class="ln">5</span>        <span class="str">"quick_think_llm"</span>: <span class="str">"gpt-6-luna"</span>,  <span class="cm"># 快速思考模型（分析师用）</span></span>
+<span class="line"><span class="ln">6</span>        <span class="str">"max_debate_rounds"</span>: <span class="num">1</span>,           <span class="cm"># 多空辩论几轮</span></span>
+<span class="line"><span class="ln">7</span>        <span class="str">"max_risk_discuss_rounds"</span>: <span class="num">1</span>,     <span class="cm"># 风控辩论几轮</span></span>
+<span class="line"><span class="ln">8</span>        <span class="str">"output_language"</span>: <span class="str">"English"</span>,     <span class="cm"># 报告语言</span></span>
+<span class="line"><span class="ln">9</span>        <span class="str">"holding_period_days"</span>: <span class="num">5</span>,         <span class="cm"># 持有几天后结算</span></span>
+<span class="line"><span class="ln">10</span>       <span class="str">"data_vendors"</span>: {</span>
+<span class="line"><span class="ln">11</span>           <span class="str">"core_stock_apis"</span>: <span class="str">"akshare,yfinance"</span>,   <span class="cm"># 行情（AKShare 优先，A 股友好）</span></span>
+<span class="line"><span class="ln">12</span>           <span class="str">"fundamental_data"</span>: <span class="str">"sec_edgar,akshare,yfinance"</span>, <span class="cm"># 财报（SEC 按 filed date）</span></span>
+<span class="line"><span class="ln">13</span>           <span class="str">"news_data"</span>: <span class="str">"akshare,yfinance"</span>,      <span class="cm"># 新闻数据源</span></span>
+<span class="line"><span class="ln">14</span>           <span class="str">"macro_data"</span>: <span class="str">"fred"</span>,                <span class="cm"># 宏观经济</span></span>
+<span class="line"><span class="ln">15</span>       },</span>
+<span class="line"><span class="ln">16</span>    })</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">重点解释</div>
+        <p><strong>双 Tier 模型</strong>：<code>quick_think_llm</code> 服务分析师/研究员/交易员（10 个角色），<code>deep_think_llm</code> 服务经理层（3 个角色）。两个 tier 可以用不同的 AI 公司！比如 quick 用 OpenAI，deep 用 Anthropic。</p>
+        <p><strong>data_vendors</strong>：每个数据类别可以配置一个或多个供应商，用逗号分隔就是 fallback 链。比如 <code>"sec_edgar,akshare,yfinance"</code> 表示先试 SEC EDGAR，失败再试 AKShare，最后 Yahoo Finance。预测市场类别可配 <code>polymarket / sse_option / none</code>，A 股批量分析用 sse_option。</p>
+        <p><strong>关掉一个可选类别</strong>：<code>macro_data</code> / <code>prediction_markets</code> 这类海外补充源可以直接配 <code>"none"</code>（也认 off / disabled / skip），router 会立即返回 <code>DATA_UNAVAILABLE</code> 哨兵，一个请求也不发 —— 国内网络下这两个源连不上，留着只会每只股票、每个话题付一次连接超时。核心类别（行情/财报/新闻）配 none 会报错，因为决策依赖它们。</p>
+        <p><strong>超时与主机跳过</strong>：海外端点用分段超时（连接 3s / 读取 10-20s）；某个主机连接失败后，本次运行会在 <code>TRADINGAGENTS_HOST_BLOCK_COOLDOWN</code>（默认 600 秒）内跳过它，不再重复等待。只有「连不上」才跳过，HTTP 4xx/5xx 与读取慢不算。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">2.2</span> 深入理解 router.py —— 数据请求怎么路由到供应商</h3>
+      <p>这是数据层最核心的文件。当分析师说"我需要 NVDA 的股价数据"时，<code>route_to_vendor()</code> 函数决定去哪个数据源获取。</p>
+
+      <div class="concept">
+        <h4>route_to_vendor() 工作流程（5 步）</h4>
+      </div>
+
+      <div class="flow">
+        <div class="flow-title">route_to_vendor() 路由流程图</div>
+        <div class="flow-row">
+          <div class="flow-node blue">分析师调用工具<br><small>如 get_stock_data("NVDA")</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 第 1 步：找类别</div>
+        <div class="flow-row">
+          <div class="flow-node green">get_category_for_method()<br><small>get_stock_data → core_stock_apis</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 第 2 步：查配置</div>
+        <div class="flow-row">
+          <div class="flow-node green">get_vendor()<br><small>查 data_vendors["core_stock_apis"] = "yfinance"</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 第 3 步：构建供应商链</div>
+        <div class="flow-row">
+          <div class="flow-node orange">vendor_chain = ["yfinance"]<br><small>如果是 "sec_edgar,yfinance" → ["sec_edgar", "yfinance"]</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 第 4 步：逐个尝试</div>
+        <div class="flow-row">
+          <div class="flow-node purple">尝试 yfinance.get_YFin_data_online()</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green" style="border-style:dashed;">成功？返回结果</div>
+        </div>
+        <div class="flow-row">
+          <div class="flow-node red" style="border-style:dashed;">失败？</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">尝试下一个供应商</div>
+        </div>
+        <div class="flow-arrow-down">▼ 第 5 步：全部失败</div>
+        <div class="flow-row">
+          <div class="flow-node red">返回哨兵值<br><small>NO_DATA_AVAILABLE 或 DATA_UNAVAILABLE</small></div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> router.py 核心逻辑（简化版）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">route_to_vendor</span>(method: str, *args, **kwargs):</span>
+<span class="line"><span class="ln">2</span>    <span class="cm"># 第 1 步：这个方法属于哪个类别？</span></span>
+<span class="line"><span class="ln">3</span>    category = get_category_for_method(method)</span>
+<span class="line"><span class="ln">4</span>    <span class="cm"># 例如：get_stock_data → "core_stock_apis"</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    <span class="cm"># 第 2 步：这个类别配置了哪些供应商？</span></span>
+<span class="line"><span class="ln">7</span>    vendor_config = get_vendor(category, method)</span>
+<span class="line"><span class="ln">8</span>    <span class="cm"># 例如："yfinance" 或 "sec_edgar,yfinance"</span></span>
+<span class="line"><span class="ln">9</span></span>
+<span class="line"><span class="ln">10</span>    <span class="cm"># 第 3 步：拆成列表</span></span>
+<span class="line"><span class="ln">11</span>    vendor_chain = [<span class="str">"yfinance"</span>]  <span class="cm"># 或 ["sec_edgar", "yfinance"]</span></span>
+<span class="line"><span class="ln">12</span></span>
+<span class="line"><span class="ln">13</span>    <span class="cm"># 第 4 步：逐个尝试</span></span>
+<span class="line"><span class="ln">14</span>    <span class="kw">for</span> vendor <span class="kw">in</span> vendor_chain:</span>
+<span class="line"><span class="ln">15</span>        vendor_impl = VENDOR_METHODS[method][vendor]</span>
+<span class="line"><span class="ln">16</span>        <span class="kw">try</span>:</span>
+<span class="line"><span class="ln">17</span>            <span class="kw">return</span> vendor_impl(*args, **kwargs)  <span class="cm"># 成功就返回！</span></span>
+<span class="line"><span class="ln">18</span>        <span class="kw">except</span> VendorUnavailableError:</span>
+<span class="line"><span class="ln">19</span>            <span class="kw">continue</span>  <span class="cm"># 这个供应商挂了，试下一个</span></span>
+<span class="line"><span class="ln">20</span>        <span class="kw">except</span> NoMarketDataError:</span>
+<span class="line"><span class="ln">21</span>            <span class="kw">continue</span>  <span class="cm"># 这个供应商没有这个股票的数据，试下一个</span></span>
+<span class="line"><span class="ln">22</span></span>
+<span class="line"><span class="ln">23</span>    <span class="cm"># 第 5 步：全部失败，返回哨兵值</span></span>
+<span class="line"><span class="ln">24</span>    <span class="kw">return</span> <span class="str">"NO_DATA_AVAILABLE: ..."</span></span>
+        </div>
+      </div>
+
+      <div class="concept">
+        <h4>两个哨兵值的区别</h4>
+        <table class="info-table">
+          <tr><th>哨兵值</th><th>含义</th><th>什么时候出现</th><th>对智能体的影响</th></tr>
+          <tr><td><code>NO_DATA_AVAILABLE</code></td><td>所有供应商都返回了"没有这个股票的数据"</td><td>股票代码无效、已退市、不在覆盖范围</td><td>智能体应报告"数据不可用"，不要编造</td></tr>
+          <tr><td><code>DATA_UNAVAILABLE</code></td><td>供应商本身出了问题（网络错误、限流、未配置）</td><td>API Key 没填、网络断了、被限流</td><td>智能体应报告"数据源暂时不可用"，不要编造</td></tr>
+        </table>
+      </div>
+
+      <div class="tip">
+        <div class="tip-label">为什么需要 fallback 链？</div>
+        <p>想象一下：Yahoo Finance 突然限流了（返回 429 错误），如果没有 fallback，整个分析就失败了。有了 fallback 链 <code>"yfinance,alpha_vantage"</code>，系统会自动切换到 Alpha Vantage 获取数据，用户完全无感知。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">2.3</span> 理解 date_window.py —— 防止"偷看未来"的防护机制</h3>
+      <p>这是量化交易中非常重要的概念：<strong>look-ahead bias（前视偏差）</strong>。简单说就是：你在 2026-09-01 做分析时，不应该看到 2026-09-02 才发布的数据。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> date_window.py 核心函数</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">as_of</span>(requested_date: str, trade_date: str) -> str:</span>
+<span class="line"><span class="ln">2</span>    <span class="str">"""确保请求的日期不超过 trade_date（分析日期）"""</span></span>
+<span class="line"><span class="ln">3</span>    <span class="kw">if</span> requested_date > trade_date:</span>
+<span class="line"><span class="ln">4</span>        <span class="kw">return</span> trade_date  <span class="cm"># 截断到 trade_date</span></span>
+<span class="line"><span class="ln">5</span>    <span class="kw">return</span> requested_date</span>
+<span class="line"><span class="ln">6</span></span>
+<span class="line"><span class="ln">7</span><span class="kw">def</span> <span class="fn">as_of_window</span>(start: str, end: str, trade_date: str):</span>
+<span class="line"><span class="ln">8</span>    <span class="str">"""确保整个日期窗口都不超过 trade_date"""</span></span>
+<span class="line"><span class="ln">9</span>    end = as_of(end, trade_date)  <span class="cm"># 结束日期不能超过 trade_date</span></span>
+<span class="line"><span class="ln">10</span>    <span class="kw">return</span> start, end</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">举例说明</div>
+        <p>假设 AI 分析师说"给我 NVDA 从 2026-08-01 到 2026-09-15 的股价"，但 trade_date 是 2026-09-01。</p>
+        <p><code>as_of_window("2026-08-01", "2026-09-15", "2026-09-01")</code> 会把结束日期截断为 2026-09-01，实际请求变成 <code>("2026-08-01", "2026-09-01")</code>。</p>
+        <p>这样就防止了 AI "偷看"分析日期之后的数据！</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== PHASE 3 ==================== -->
+<div class="phase p3">
+  <div class="phase-title"><div class="num">3</div> 智能体系统深入</div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">3.1</span> 理解 AgentState —— 贯穿全程的"数据背包"</h3>
+      <p>想象每个智能体都背着一个"背包"，里面装着分析过程中产生的所有信息。这个背包就是 <code>AgentState</code>。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> state.py（简化版）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">class</span> <span class="dec">AgentState</span>(MessagesState):</span>
+<span class="line"><span class="ln">2</span>    company_of_interest: str    <span class="cm"># "NVDA" — 分析哪只股票</span></span>
+<span class="line"><span class="ln">3</span>    trade_date: str             <span class="cm"># "2026-09-01" — 分析日期</span></span>
+<span class="line"><span class="ln">4</span>    instrument_context: str     <span class="cm"># "NVIDIA Corporation, US stock" — 公司身份</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    <span class="cm"># === 分析师报告（并行写入，互不干扰）===</span></span>
+<span class="line"><span class="ln">7</span>    market_report: str          <span class="cm"># 技术分析师的报告</span></span>
+<span class="line"><span class="ln">8</span>    sentiment_report: str       <span class="cm"># 情绪分析师的报告</span></span>
+<span class="line"><span class="ln">9</span>    news_report: str            <span class="cm"># 新闻分析师的报告</span></span>
+<span class="line"><span class="ln">10</span>   fundamentals_report: str    <span class="cm"># 基本面分析师的报告</span></span>
+<span class="line"><span class="ln">11</span></span>
+<span class="line"><span class="ln">12</span>   <span class="cm"># === 研究辩论状态 ===</span></span>
+<span class="line"><span class="ln">13</span>   investment_debate_state: dict  <span class="cm"># 多空辩论记录</span></span>
+<span class="line"><span class="ln">14</span>   investment_plan: str           <span class="cm"># 研究经理的综合建议</span></span>
+<span class="line"><span class="ln">15</span></span>
+<span class="line"><span class="ln">16</span>   <span class="cm"># === 交易 & 风控 ===</span></span>
+<span class="line"><span class="ln">17</span>   trader_investment_plan: str    <span class="cm"># 交易员的提案</span></span>
+<span class="line"><span class="ln">18</span>   risk_debate_state: dict        <span class="cm"># 风控三方辩论记录</span></span>
+<span class="line"><span class="ln">19</span></span>
+<span class="line"><span class="ln">20</span>   <span class="cm"># === 最终输出 ===</span></span>
+<span class="line"><span class="ln">21</span>   final_trade_decision: str    <span class="cm"># 组合经理的最终决策文本</span></span>
+<span class="line"><span class="ln">22</span>   final_rating: str            <span class="cm"># "Buy" / "Sell" / ... / "REVIEW"</span></span>
+<span class="line"><span class="ln">23</span></span>
+<span class="line"><span class="ln">24</span>   <span class="cm"># === 记忆系统 ===</span></span>
+<span class="line"><span class="ln">25</span>   past_context: str            <span class="cm"># 历史教训（注入给组合经理）</span></span>
+<span class="line"><span class="ln">26</span>   portfolio_context: str       <span class="cm"># 用户的持仓信息（可选）</span></span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">关键理解</div>
+        <p>每个字段对应流程中的一个阶段。分析师只写自己的 report 字段（如 <code>market_report</code>），不会碰别人的字段，所以 4 个分析师可以<strong>同时工作</strong>（并行）。</p>
+        <p>数据流向是单向的：分析师 → 研究员 → 交易员 → 风控 → 组合经理。后面的角色可以看到前面所有人的输出。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">3.2</span> 理解 tools.py —— 分析师的"工具箱"</h3>
+      <p>每个分析师都有一些"工具"可以调用，就像给 AI 配备了搜索引擎、数据库查询等能力。这些工具用 <code>@tool</code> 装饰器定义。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> tools.py 示例（get_stock_data）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="dec">@tool</span>  <span class="cm"># 这个装饰器告诉 LangGraph：这是一个可调用的工具</span></span>
+<span class="line"><span class="ln">2</span><span class="kw">def</span> <span class="fn">get_stock_data</span>(</span>
+<span class="line"><span class="ln">3</span>    symbol: Annotated[str, InjectedState(<span class="str">"company_of_interest"</span>)],</span>
+<span class="line"><span class="ln">4</span>    start_date: Annotated[str, <span class="str">"Start date in yyyy-mm-dd format"</span>],</span>
+<span class="line"><span class="ln">5</span>    end_date: Annotated[str, <span class="str">"End date in yyyy-mm-dd format"</span>],</span>
+<span class="line"><span class="ln">6</span>    trade_date: Annotated[str, InjectedState(<span class="str">"trade_date"</span>)] = <span class="str">""</span>,</span>
+<span class="line"><span class="ln">7</span>) -> str:</span>
+<span class="line"><span class="ln">8</span>    <span class="str">"""Retrieve stock price data (OHLCV) for the instrument."""</span></span>
+<span class="line"><span class="ln">9</span>    start_date, end_date = as_of_window(start_date, end_date, trade_date)</span>
+<span class="line"><span class="ln">10</span>   <span class="kw">return</span> route_to_vendor(<span class="str">"get_stock_data"</span>, symbol, start_date, end_date)</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">逐行解释</div>
+        <p><strong>第 3 行</strong>：<code>InjectedState("company_of_interest")</code> 是一个"自动注入"机制。AI 调用这个工具时<strong>不需要传 symbol 参数</strong>，系统会自动从 AgentState 中取出 <code>company_of_interest</code>（即 "NVDA"）填进去。</p>
+        <p><strong>第 6 行</strong>：同理，<code>trade_date</code> 也是自动注入的，AI 不需要传。</p>
+        <p><strong>第 9 行</strong>：调用 <code>as_of_window()</code> 做日期截断，防止 look-ahead。</p>
+        <p><strong>第 10 行</strong>：调用 <code>route_to_vendor()</code> 去获取数据。注意这里传的是字符串 <code>"get_stock_data"</code>，router 会根据这个名字找到对应的供应商实现。</p>
+      </div>
+
+      <div class="concept">
+        <h4>所有工具函数清单</h4>
+        <table class="info-table">
+          <tr><th>工具函数</th><th>谁用</th><th>获取什么数据</th><th>数据源</th></tr>
+          <tr><td><code>get_stock_data</code></td><td>Market Analyst</td><td>OHLCV 股价</td><td>yfinance / alpha_vantage</td></tr>
+          <tr><td><code>get_indicators</code></td><td>Market Analyst</td><td>RSI/MACD 等技术指标</td><td>yfinance / alpha_vantage</td></tr>
+          <tr><td><code>get_verified_market_snapshot</code></td><td>Market Analyst</td><td>验证后的市场快照</td><td>yfinance</td></tr>
+          <tr><td><code>get_fundamentals</code></td><td>Fundamentals Analyst</td><td>综合基本面数据</td><td>sec_edgar / yfinance</td></tr>
+          <tr><td><code>get_balance_sheet</code></td><td>Fundamentals Analyst</td><td>资产负债表</td><td>sec_edgar / yfinance</td></tr>
+          <tr><td><code>get_income_statement</code></td><td>Fundamentals Analyst</td><td>利润表</td><td>sec_edgar / yfinance</td></tr>
+          <tr><td><code>get_cashflow</code></td><td>Fundamentals Analyst</td><td>现金流量表</td><td>sec_edgar / yfinance</td></tr>
+          <tr><td><code>get_news</code></td><td>News Analyst</td><td>公司新闻</td><td>yfinance / alpha_vantage</td></tr>
+          <tr><td><code>get_global_news</code></td><td>News Analyst</td><td>全球宏观新闻</td><td>yfinance / alpha_vantage</td></tr>
+          <tr><td><code>get_insider_transactions</code></td><td>News Analyst</td><td>内部人交易</td><td>yfinance / alpha_vantage</td></tr>
+          <tr><td><code>get_macro_indicators</code></td><td>News Analyst</td><td>CPI/利率等宏观指标</td><td>FRED</td></tr>
+          <tr><td><code>get_prediction_markets</code></td><td>News Analyst</td><td>预测市场概率</td><td>Polymarket</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">3.3</span> 理解 rating.py —— 5 级评级怎么从 AI 文本中提取</h3>
+      <p>AI 输出的是自由文本（比如"我们建议买入 NVDA，因为..."），系统需要从中提取出标准化的评级。</p>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> rating.py 核心逻辑</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="cm"># 5 级评级（从最看多到最看空）</span></span>
+<span class="line"><span class="ln">2</span>RATINGS_5_TIER = (<span class="str">"Buy"</span>, <span class="str">"Overweight"</span>, <span class="str">"Hold"</span>, <span class="str">"Underweight"</span>, <span class="str">"Sell"</span>)</span>
+<span class="line"><span class="ln">3</span></span>
+<span class="line"><span class="ln">4</span><span class="kw">def</span> <span class="fn">extract_rating</span>(text: str) -> str | None:</span>
+<span class="line"><span class="ln">5</span>    <span class="cm"># 用正则表达式在文本中找 "Rating: Buy" 这样的模式</span></span>
+<span class="line"><span class="ln">6</span>    <span class="cm">#  tolerant of markdown bold: "**Rating**: Buy"</span></span>
+<span class="line"><span class="ln">7</span>    <span class="cm">#  tolerant of fullwidth punctuation: "Rating：Buy"</span></span>
+<span class="line"><span class="ln">8</span>    ...</span>
+<span class="line"><span class="ln">9</span>    <span class="kw">return</span> <span class="str">"Buy"</span>  <span class="cm"># 或 None（找不到时）</span></span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span><span class="kw">def</span> <span class="fn">parse_rating</span>(text: str, default=<span class="str">"REVIEW"</span>) -> str:</span>
+<span class="line"><span class="ln">12</span>    rating = extract_rating(text)</span>
+<span class="line"><span class="ln">13</span>    <span class="kw">return</span> rating <span class="kw">if</span> rating <span class="kw">else</span> default  <span class="cm"># 找不到就返回 "REVIEW"</span></span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">什么是 REVIEW？</div>
+        <p>当 AI 的输出中找不到任何可识别的评级时（比如 AI 写了一堆分析但没说 Buy 还是 Sell），系统返回 <code>REVIEW</code>。这不是一个可交易的信号，而是告诉用户"这个决策需要人工复查"。</p>
+        <p><strong>重要</strong>：REVIEW 不等于 Hold！Hold 是一个明确的"持有"决策，REVIEW 是"无法解析"。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== PHASE 4 ==================== -->
+<div class="phase p4">
+  <div class="phase-title"><div class="num">4</div> LangGraph 图编排引擎</div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">4.1</span> 什么是 LangGraph？用"流程图"来理解</h3>
+
+      <div class="concept">
+        <h4>LangGraph 是什么？</h4>
+        <p>LangGraph 是一个 Python 库，让你用代码定义"流程图"。每个方框是一个<strong>节点</strong>（Node），每条箭头是一条<strong>边</strong>（Edge）。程序按照流程图的顺序执行。</p>
+        <p>TradingAgents 用 LangGraph 来编排 11 个 AI 智能体的协作顺序。</p>
+      </div>
+
+      <div class="flow">
+        <div class="flow-title">TradingAgents 的 LangGraph 流程图</div>
+        <div class="flow-row">
+          <div class="flow-node blue">START</div>
+        </div>
+        <div class="flow-arrow-down">▼ 并行启动（所有分析师 + Memory Log 同时开始）</div>
+        <div class="flow-row">
+          <div class="flow-node green">Market Analyst</div>
+          <div class="flow-node green">Sentiment Analyst</div>
+          <div class="flow-node green">News Analyst</div>
+          <div class="flow-node green">Fundamentals Analyst</div>
+          <div class="flow-node yellow" style="border-style:dashed;">Memory Log</div>
+        </div>
+        <div class="flow-arrow-down">▼ 全部完成后 →</div>
+        <div class="flow-row">
+          <div class="flow-node orange">Bull Researcher</div>
+          <div class="flow-arrow">⇄</div>
+          <div class="flow-node orange">Bear Researcher</div>
+        </div>
+        <div class="flow-arrow-down">▼ max_debate_rounds 轮后 →</div>
+        <div class="flow-row">
+          <div class="flow-node purple">Research Manager</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">Trader</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node pink">Aggressive</div>
+          <div class="flow-arrow">⇄</div>
+          <div class="flow-node pink">Conservative</div>
+          <div class="flow-arrow">⇄</div>
+          <div class="flow-node pink">Neutral</div>
+        </div>
+        <div class="flow-arrow-down">▼ max_risk_discuss_rounds 轮后 →</div>
+        <div class="flow-row">
+          <div class="flow-node purple">Portfolio Manager</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node yellow">END</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">4.2</span> 理解 setup.py —— 图是怎么建出来的</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> setup.py 核心逻辑（简化）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">setup_graph</span>(self, selected_analysts, memory_node=None):</span>
+<span class="line"><span class="ln">2</span>    <span class="cm"># 创建一张空图</span></span>
+<span class="line"><span class="ln">3</span>    workflow = StateGraph(AgentState)</span>
+<span class="line"><span class="ln">4</span></span>
+<span class="line"><span class="ln">5</span>    <span class="cm"># 添加分析师节点（每个分析师是一个子图）</span></span>
+<span class="line"><span class="ln">6</span>    <span class="kw">for</span> spec <span class="kw">in</span> plan.specs:</span>
+<span class="line"><span class="ln">7</span>        workflow.add_node(spec.agent_node, _analyst_graph(...))</span>
+<span class="line"><span class="ln">8</span></span>
+<span class="line"><span class="ln">9</span>    <span class="cm"># 添加其他节点</span></span>
+<span class="line"><span class="ln">10</span>   workflow.add_node(<span class="str">"Bull Researcher"</span>, bull_researcher_node)</span>
+<span class="line"><span class="ln">11</span>   workflow.add_node(<span class="str">"Bear Researcher"</span>, bear_researcher_node)</span>
+<span class="line"><span class="ln">12</span>   workflow.add_node(<span class="str">"Research Manager"</span>, research_manager_node)</span>
+<span class="line"><span class="ln">13</span>   workflow.add_node(<span class="str">"Trader"</span>, trader_node)</span>
+<span class="line"><span class="ln">14</span>   <span class="cm"># ... 风控节点、组合经理节点 ...</span></span>
+<span class="line"><span class="ln">15</span></span>
+<span class="line"><span class="ln">16</span>   <span class="cm"># 添加边：START → 所有分析师（并行）</span></span>
+<span class="line"><span class="ln">17</span>   <span class="kw">for</span> node <span class="kw">in</span> first_steps:</span>
+<span class="line"><span class="ln">18</span>       workflow.add_edge(START, node)</span>
+<span class="line"><span class="ln">19</span></span>
+<span class="line"><span class="ln">20</span>   <span class="cm"># 分析师全部完成后 → Bull Researcher</span></span>
+<span class="line"><span class="ln">21</span>   workflow.add_edge(first_steps, <span class="str">"Bull Researcher"</span>)</span>
+<span class="line"><span class="ln">22</span></span>
+<span class="line"><span class="ln">23</span>   <span class="cm"># 条件边：Bull/Bear 之间循环辩论</span></span>
+<span class="line"><span class="ln">24</span>   workflow.add_conditional_edges(<span class="str">"Bull Researcher"</span>,</span>
+<span class="line"><span class="ln">25</span>       should_continue_debate, DEBATE_PATH_MAP)</span>
+<span class="line"><span class="ln">26</span></span>
+<span class="line"><span class="ln">27</span>   <span class="cm"># 研究经理 → 交易员 → 风控 → 组合经理 → END</span></span>
+<span class="line"><span class="ln">28</span>   workflow.add_edge(<span class="str">"Research Manager"</span>, <span class="str">"Trader"</span>)</span>
+<span class="line"><span class="ln">29</span>   workflow.add_edge(<span class="str">"Trader"</span>, <span class="str">"Aggressive Analyst"</span>)</span>
+<span class="line"><span class="ln">30</span>   workflow.add_edge(<span class="str">"Portfolio Manager"</span>, END)</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">关键概念解释</div>
+        <p><strong><code>add_edge(A, B)</code></strong>：固定边，A 完成后一定去 B。</p>
+        <p><strong><code>add_conditional_edges(A, func, path_map)</code></strong>：条件边，A 完成后调用 <code>func</code> 函数，根据返回值决定去哪个节点。</p>
+        <p><strong><code>first_steps</code> 列表传给 <code>add_edge</code></strong>：表示这些节点并行启动，等<strong>全部</strong>完成后才触发下一个节点。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">4.3</span> 理解 conditional_logic.py —— 辩论怎么控制轮数</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> conditional_logic.py</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">should_continue_debate</span>(self, state):</span>
+<span class="line"><span class="ln">2</span>    count = state[<span class="str">"investment_debate_state"</span>][<span class="str">"count"</span>]</span>
+<span class="line"><span class="ln">3</span>    max_count = <span class="num">2</span> * self.max_debate_rounds</span>
+<span class="line"><span class="ln">4</span>    <span class="cm"># 为什么 ×2？因为每轮辩论 = Bull 说一次 + Bear 说一次</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    <span class="kw">if</span> count >= max_count:</span>
+<span class="line"><span class="ln">7</span>        <span class="kw">return</span> <span class="str">"Research Manager"</span>  <span class="cm"># 辩论结束，交给经理</span></span>
+<span class="line"><span class="ln">8</span></span>
+<span class="line"><span class="ln">9</span>    <span class="cm"># 根据最后发言者决定下一个是谁</span></span>
+<span class="line"><span class="ln">10</span>   <span class="kw">if</span> state[<span class="str">"investment_debate_state"</span>][<span class="str">"current_response"</span>].startswith(<span class="str">"Bull"</span>):</span>
+<span class="line"><span class="ln">11</span>       <span class="kw">return</span> <span class="str">"Bear Researcher"</span>   <span class="cm"># Bull 刚说完 → 轮到 Bear</span></span>
+<span class="line"><span class="ln">12</span>   <span class="kw">return</span> <span class="str">"Bull Researcher"</span>       <span class="cm"># 否则轮到 Bull</span></span>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-title">辩论轮数控制流程图（max_debate_rounds=2 时）</div>
+        <div class="flow-row">
+          <div class="flow-node orange">Bull (count=0→1)</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">Bear (count=1→2)</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">Bull (count=2→3)</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">Bear (count=3→4)</div>
+        </div>
+        <div class="flow-arrow-down">▼ count=4 >= 2×2=4，辩论结束</div>
+        <div class="flow-row">
+          <div class="flow-node purple">Research Manager</div>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">风控辩论同理</div>
+        <p>风控有 3 个辩论员（Aggressive → Conservative → Neutral），所以条件是 <code>count >= 3 * max_risk_discuss_rounds</code>。每轮 3 个人各说一次。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">4.4</span> 理解检查点机制 —— 崩溃了怎么恢复</h3>
+
+      <div class="concept">
+        <h4>检查点是什么？</h4>
+        <p>想象你在玩一个很长的游戏，每过一关系统自动存档。如果游戏崩溃了，你可以从最近的存档继续，不用从头开始。</p>
+        <p>TradingAgents 的检查点就是这样：每完成一个节点（一个智能体的工作），就把当前状态保存到 SQLite 数据库。如果程序崩溃，下次运行会自动从最后一个成功的节点继续。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Bash</span> 使用检查点</div>
+        <div class="code-body">
+<span class="line"><span class="cm"># CLI 方式：加 --checkpoint 参数</span></span>
+<span class="line">tradingagents --ticker NVDA --date 2026-09-01 --checkpoint</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 如果崩溃了，再跑一次同样的命令，会自动从断点恢复</span></span>
+<span class="line">tradingagents --ticker NVDA --date 2026-09-01 --checkpoint</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 成功后检查点自动清除。想手动清除：</span></span>
+<span class="line">tradingagents --ticker NVDA --date 2026-09-01 --clear-checkpoints</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">签名机制</div>
+        <p>每个检查点都有一个"签名"，由分析师选择、辩论轮数、配置等计算得出。如果你改了配置（比如换了模型），签名就变了，旧检查点自动失效，从头开始。这样避免了用旧状态继续新配置导致的错误。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== PHASE 5 ==================== -->
+<div class="phase p5">
+  <div class="phase-title"><div class="num">5</div> 记忆系统 & 回测引擎</div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">5.1</span> 理解决策日志 —— 每次运行的"日记本"</h3>
+
+      <div class="concept">
+        <h4>记忆日志是什么？</h4>
+        <p>每次运行结束后，系统会把决策写入一个 Markdown 文件（默认在 <code>~/.tradingagents/memory/trading_memory.md</code>）。这个文件就像一个"日记本"，记录了每次分析的决策和后续的实际结果。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Markdown</span> trading_memory.md 格式示例</div>
+        <div class="code-body">
+<span class="line">[2026-09-01 | NVDA | Buy | +3.2% | +1.8% | 5d | resolved:2026-09-08]</span>
+<span class="line"></span>
+<span class="line">DECISION:</span>
+<span class="line">Based on strong technical indicators and positive sentiment...</span>
+<span class="line"></span>
+<span class="line">REFLECTION:</span>
+<span class="line">The Buy call was correct. NVDA gained 3.2% vs SPY's 1.4%...</span>
+<span class="line"></span>
+<span class="line">&lt;!-- ENTRY_END --&gt;</span>
+<span class="line"></span>
+<span class="line">[2026-09-08 | NVDA | Hold | pending]</span>
+<span class="line"></span>
+<span class="line">DECISION:</span>
+<span class="line">Mixed signals from analysts suggest waiting...</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">标签行格式解读</div>
+        <p><code>[日期 | 股票 | 评级 | 实际回报 | Alpha回报 | 持有天数 | resolved:结算日期]</code></p>
+        <ul>
+          <li><code>pending</code>：还没到结算日，不知道结果</li>
+          <li><code>+3.2%</code>：NVDA 在持有期内涨了 3.2%</li>
+          <li><code>+1.8%</code>：扣除基准（SPY）后的超额回报（Alpha）</li>
+          <li><code>resolved:2026-09-08</code>：这个结果是在 9 月 8 日知道的（用于 point-in-time 过滤）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">5.2</span> 理解结算流程 —— 怎么知道决策对不对</h3>
+
+      <div class="flow">
+        <div class="flow-title">结算流程图</div>
+        <div class="flow-row">
+          <div class="flow-node blue">下次运行时自动触发</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">找到所有 pending 条目</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">fetch_returns()<br><small>获取 NVDA 和 SPY 的实际价格</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node orange">计算 raw_return 和 alpha_return<br><small>raw = (退出价-入场价)/入场价<br>alpha = raw - benchmark_return</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node purple">Reflector.reflect_on_final_decision()<br><small>让 AI 根据结果写一段反思</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node yellow">update_with_outcome()<br><small>把结果和反思写回日志</small></div>
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> settlement.py 核心逻辑（简化）</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">settle_pending</span>(ticker, memory_log, reflector, config):</span>
+<span class="line"><span class="ln">2</span>    pending = memory_log.get_pending_entries()  <span class="cm"># 找所有 pending 条目</span></span>
+<span class="line"><span class="ln">3</span>    benchmark = resolve_benchmark(ticker, config)  <span class="cm"># 找基准（如 SPY）</span></span>
+<span class="line"><span class="ln">4</span></span>
+<span class="line"><span class="ln">5</span>    <span class="kw">for</span> entry <span class="kw">in</span> pending:</span>
+<span class="line"><span class="ln">6</span>        <span class="cm"># 获取实际回报</span></span>
+<span class="line"><span class="ln">7</span>        raw, alpha, days, resolution_date = fetch_returns(</span>
+<span class="line"><span class="ln">8</span>            ticker, entry[<span class="str">"date"</span>], config[<span class="str">"holding_period_days"</span>], benchmark</span>
+<span class="line"><span class="ln">9</span>        )</span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span>       <span class="kw">if</span> raw <span class="kw">is None</span>:</span>
+<span class="line"><span class="ln">12</span>           <span class="kw">continue</span>  <span class="cm"># 持有期还没到，跳过</span></span>
+<span class="line"><span class="ln">13</span></span>
+<span class="line"><span class="ln">14</span>       <span class="cm"># 让 AI 写反思</span></span>
+<span class="line"><span class="ln">15</span>       reflection = reflector.reflect_on_final_decision(</span>
+<span class="line"><span class="ln">16</span>           final_decision=entry[<span class="str">"decision"</span>],</span>
+<span class="line"><span class="ln">17</span>           raw_return=raw, alpha_return=alpha,</span>
+<span class="line"><span class="ln">18</span>           benchmark_name=benchmark</span>
+<span class="line"><span class="ln">19</span>       )</span>
+<span class="line"><span class="ln">20</span></span>
+<span class="line"><span class="ln">21</span>       <span class="cm"># 写回日志</span></span>
+<span class="line"><span class="ln">22</span>       memory_log.update_with_outcome(ticker, entry[<span class="str">"date"</span>], raw, alpha, days, reflection)</span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">Point-in-Time 语义</div>
+        <p><code>resolved:2026-09-08</code> 这个字段很重要！当你在 2026-09-05 做分析时，系统只会加载 <code>resolved <= 2026-09-05</code> 的历史教训。这样就不会"偷看"未来的结果。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">5.3</span> 理解回测引擎 —— 批量评估决策质量</h3>
+
+      <div class="concept">
+        <h4>回测是什么？</h4>
+        <p>单次分析不能说明系统好不好。回测就是让系统在<strong>多个股票 × 多个日期</strong>的网格上运行，然后统计整体表现。</p>
+        <p>比如：对 NVDA 和 AAPL，从 2026-06-01 到 2026-08-01，每隔 7 天分析一次，总共 4 个日期 × 2 只股票 = 8 个"单元格"。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> 回测使用示例</div>
+        <div class="code-body">
+<span class="line"><span class="kw">from</span> tradingagents.backtest <span class="kw">import</span> iter_grid, run_backtest, summarize</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 生成日期网格：从 6月1日 到 8月1日，每 7 天一个日期</span></span>
+<span class="line">dates = iter_grid(<span class="str">"2026-06-01"</span>, <span class="str">"2026-08-01"</span>, every_n_days=<span class="num">7</span>)</span>
+<span class="line"><span class="cm"># 结果：["2026-06-01", "2026-06-08", "2026-06-15", ...]</span></span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 运行回测</span></span>
+<span class="line">result = run_backtest([<span class="str">"NVDA"</span>, <span class="str">"AAPL"</span>], dates, config)</span>
+<span class="line"></span>
+<span class="line"><span class="cm"># 查看汇总</span></span>
+<span class="line"><span class="fn">print</span>(summarize(result).render())</span>
+<span class="line"><span class="cm"># 输出类似：</span></span>
+<span class="line"><span class="cm"># Resolved cells: 8 · pending: 0</span></span>
+<span class="line"><span class="cm"># - Buy: n=3, called the direction 67%, mean alpha +2.1% vs the benchmark</span></span>
+<span class="line"><span class="cm"># - Hold: n=2, no direction claimed, mean alpha +0.3% vs the benchmark</span></span>
+<span class="line"><span class="cm"># - Sell: n=1, called the direction 100%, mean alpha +3.5% vs the benchmark</span></span>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">评分指标解释</div>
+        <p><strong>hit_rate（命中率）</strong>：Buy/Overweight 的决策中，实际涨了的占比；Sell/Underweight 的决策中，实际跌了的占比。Hold 没有方向，所以不计算命中率。</p>
+        <p><strong>mean_alpha（平均超额回报）</strong>：所有该评级决策的平均 alpha 回报。正数表示跑赢了基准。</p>
+        <p><strong>重要</strong>：回测使用独立的记忆日志（在 <code>results_dir/backtest/</code> 下），不会污染你的实盘记忆。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== PHASE 6 ==================== -->
+<div class="phase p6">
+  <div class="phase-title"><div class="num">6</div> LLM 层 & 进阶主题</div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">6.1</span> 理解 LLM 客户端工厂 —— 怎么支持 20+ 个 AI 公司</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">Python</span> factory.py 核心逻辑</div>
+        <div class="code-body">
+<span class="line"><span class="ln">1</span><span class="kw">def</span> <span class="fn">create_tier_client</span>(config, tier, **extra):</span>
+<span class="line"><span class="ln">2</span>    <span class="cm"># tier 是 "quick" 或 "deep"</span></span>
+<span class="line"><span class="ln">3</span>    provider = tier_provider(config, tier)</span>
+<span class="line"><span class="ln">4</span>    <span class="cm"># 如果配置了 quick_think_provider，就用它；否则用 llm_provider</span></span>
+<span class="line"><span class="ln">5</span></span>
+<span class="line"><span class="ln">6</span>    model = config[f<span class="str">"{tier}_think_llm"</span>]</span>
+<span class="line"><span class="ln">7</span>    <span class="cm"># quick → "gpt-6-luna", deep → "gpt-6-sol"</span></span>
+<span class="line"><span class="ln">8</span></span>
+<span class="line"><span class="ln">9</span>    <span class="kw">return</span> create_llm_client(provider=provider, model=model, ...)</span>
+<span class="line"><span class="ln">10</span></span>
+<span class="line"><span class="ln">11</span><span class="kw">def</span> <span class="fn">create_llm_client</span>(provider, model, base_url=None, **kwargs):</span>
+<span class="line"><span class="ln">12</span>    <span class="kw">if</span> provider == <span class="str">"anthropic"</span>:</span>
+<span class="line"><span class="ln">13</span>        <span class="kw">return</span> AnthropicClient(model, ...)</span>
+<span class="line"><span class="ln">14</span>    <span class="kw">if</span> provider == <span class="str">"google"</span>:</span>
+<span class="line"><span class="ln">15</span>        <span class="kw">return</span> GoogleClient(model, ...)</span>
+<span class="line"><span class="ln">16</span>    <span class="kw">if</span> provider == <span class="str">"openai"</span>:</span>
+<span class="line"><span class="ln">17</span>        <span class="kw">return</span> OpenAIClient(model, ...)</span>
+<span class="line"><span class="ln">18</span>    <span class="cm"># ... 更多提供商 ...</span></span>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-title">LLM 客户端创建流程</div>
+        <div class="flow-row">
+          <div class="flow-node blue">config 配置</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">tier_provider()<br><small>决定用哪个 AI 公司</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node green">create_llm_client()<br><small>工厂方法创建客户端</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node purple">AnthropicClient</div>
+          <div class="flow-node purple">GoogleClient</div>
+          <div class="flow-node purple">OpenAIClient</div>
+          <div class="flow-node purple">AzureClient</div>
+          <div class="flow-node purple">BedrockClient</div>
+          <div class="flow-node purple">...</div>
+        </div>
+        <div class="flow-arrow-down">▼ 都继承自</div>
+        <div class="flow-row">
+          <div class="flow-node yellow">BaseLLMClient<br><small>统一接口：get_llm() 返回 LangChain 兼容的模型对象</small></div>
+        </div>
+      </div>
+
+      <div class="annotation">
+        <div class="label">双 Tier 配置示例</div>
+        <p>你可以在 .env 中这样配置，让经理层用 Claude，分析师用 GPT：</p>
+        <p><code>TRADINGAGENTS_LLM_PROVIDER=openai</code><br><code>TRADINGAGENTS_QUICK_THINK_LLM=gpt-6-luna</code><br><code>TRADINGAGENTS_DEEP_THINK_PROVIDER=anthropic</code><br><code>TRADINGAGENTS_DEEP_THINK_LLM=claude-opus-5-5</code></p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">6.2</span> 完整运行一次：从输入到输出的全链路追踪</h3>
+
+      <div class="flow">
+        <div class="flow-title">完整运行链路：python main.py 发生了什么</div>
+        <div class="flow-row">
+          <div class="flow-node blue">python main.py</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">__init__.py: load_dotenv()<br><small>读取 .env 文件到环境变量</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">DEFAULT_CONFIG: build_default_config()<br><small>加载默认配置 + 环境变量覆盖</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node green">TradingAgentsGraph(debug=True, config=config)<br><small>创建两个 LLM 客户端 + 编译 LangGraph</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node orange">ta.propagate("NVDA", "2026-09-01")<br><small>验证日期 → 解析公司身份 → 创建初始状态</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node orange">graph.invoke(init_state)<br><small>LangGraph 开始执行流程图</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 并行阶段</div>
+        <div class="flow-row">
+          <div class="flow-node green">Market Analyst<br><small>调用 get_stock_data, get_indicators</small></div>
+          <div class="flow-node green">Sentiment Analyst<br><small>读取 Reddit, StockTwits</small></div>
+          <div class="flow-node green">News Analyst<br><small>调用 get_news, get_global_news</small></div>
+          <div class="flow-node green">Fundamentals Analyst<br><small>调用 get_fundamentals, get_balance_sheet</small></div>
+          <div class="flow-node yellow" style="border-style:dashed;">Memory Log<br><small>结算历史 + 加载教训</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 串行阶段</div>
+        <div class="flow-row">
+          <div class="flow-node orange">Bull ⇄ Bear 辩论</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node purple">Research Manager</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node orange">Trader</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node pink">Aggressive ⇄ Conservative ⇄ Neutral</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node purple">Portfolio Manager</div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node yellow">record_decision()<br><small>写入记忆日志</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node yellow">run_rating()<br><small>提取 5 级评级</small></div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node yellow">return (state, "Buy")<br><small>返回结果</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">6.3</span> 常用操作速查表</h3>
+
+      <table class="info-table">
+        <tr><th>我想...</th><th>怎么做</th></tr>
+        <tr><td><strong>自动选股推荐 ⭐</strong></td><td><code>tradingagents screener --top 3</code>（从全 A 股中智能筛选）</td></tr>
+        <tr><td>运行一次分析</td><td><code>python main.py</code> 或 <code>tradingagents --ticker NVDA --date 2026-09-01</code></td></tr>
+        <tr><td>换 AI 模型</td><td>改 .env 中的 <code>TRADINGAGENTS_QUICK_THINK_LLM</code> 和 <code>TRADINGAGENTS_DEEP_THINK_LLM</code></td></tr>
+        <tr><td>换 AI 公司</td><td>改 .env 中的 <code>TRADINGAGENTS_LLM_PROVIDER</code>（openai/google/anthropic/deepseek/）</td></tr>
+        <tr><td>增加辩论轮数</td><td>改 .env 中的 <code>TRADINGAGENTS_MAX_DEBATE_ROUNDS=3</code></td></tr>
+        <tr><td>用本地模型</td><td>设 <code>TRADINGAGENTS_LLM_PROVIDER=ollama</code>，然后 <code>ollama pull llama3</code></td></tr>
+        <tr><td>跑回测</td><td><code>tradingagents backtest NVDA,AAPL --start 2026-06-01 --end 2026-08-01 --every 7</code></td></tr>
+        <tr><td>启用检查点</td><td>加 <code>--checkpoint</code> 参数</td></tr>
+        <tr><td>传入持仓</td><td><code>tradingagents --ticker NVDA --date 2026-09-01 --portfolio my_book.json</code></td></tr>
+        <tr><td>只看特定分析师</td><td><code>--analysts market,news,fundamentals</code>（跳过 sentiment）</td></tr>
+        <tr><td>生成 HTML 报告</td><td>默认就会生成，加 <code>--no-html</code> 可以跳过</td></tr>
+        <tr><td>用 Docker 运行</td><td><code>cp .env.example .env</code> 填好密钥，然后 <code>docker compose run --rm tradingagents</code></td></tr>
+        <tr><td>查看已有知识卡</td><td><code>~/.tradingagents/memory/trading_memory.md</code> 文件</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== 新增：内置选股器 ==================== -->
+<div class="phase p2" style="margin-top:48px;">
+  <div class="phase-title">
+    <div class="num">⭐</div>
+    <span>新增：内置选股器 — 五步筛选 + 交互确认，智能推荐 Top 3</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <h3><span class="step-num">新功能</span> 什么是内置选股器？</h3>
+      <p>内置选股器是 TradingAgents 的自动化选股工具，采用<strong>五步筛选漏斗</strong>：从 5000+ 只 A 股逐级筛选（基础过滤→资金面→消息面→技术面）找出几十只潜力股，交互确认后用多智能体深度分析推荐 Top 3。</p>
+
+      <div class="concept">
+        <h4>🎯 核心特点：五步筛选 + 交互确认</h4>
+        <ul>
+          <li><strong>全市场覆盖</strong>：从 5000+ 只 A 股中智能筛选（非固定股票池）</li>
+          <li><strong>逐级筛选漏斗</strong>：基础过滤 → 资金面前 100 → 消息面利好板块 → 技术面几十只</li>
+          <li><strong>消息面优先</strong>：消息面筛选在技术指标计算之前，节省大量 API 调用时间</li>
+          <li><strong>交互确认</strong>：筛选完成后打印潜力股列表，由你决定是否深度分析（<code>--yes</code> 跳过提问，无人值守用）</li>
+          <li><strong>多智能体深度分析</strong>：复用 TradingAgents 的 11 个 LLM 智能体分析引擎</li>
+          <li><strong>综合评分排序</strong>：LLM 评级 40% + 技术面 30% + 资金面 20% + 动量 10%</li>
+          <li><strong>最终推荐输出</strong>：以表格清晰列出 Top 3 股票代码、名称、上涨潜力分数、综合评级</li>
+          <li><strong>交易点位建议</strong>：每只股票一行给出阻力位、支撑位、建议买入价、建议卖出价（近 20 个交易日高低点分位）</li>
+          <li><strong>盘前也可用</strong>：开盘前东财“今日”资金流为空时，资金面与板块热度自动改用最近一个已完成交易日的数据（近 5 日排行取候选池 + 并发精查），不会因筛出 0 只而中断</li>
+          <li><strong>自动报告生成</strong>：Markdown/HTML 格式的详细分析报告</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">使用方法</span> 一键运行选股器</h3>
+
+      <div class="code-block">
+        <div class="code-header"><span class="lang">PowerShell</span> 运行内置选股器</div>
+        <div class="code-body">
+<span class="cm"># 第一步：激活虚拟环境</span>
+<span class="fn">.\.venv\Scripts\activate.bat</span>
+
+<span class="cm"># 第二步：运行选股器（自动推荐 Top 3）</span>
+<span class="fn">tradingagents</span> screener --top 3 --workers 1
+
+<span class="cm"># 运行后会：</span>
+<span class="cm"># 1. 从 5000+ 只 A 股中筛选潜力股</span>
+<span class="cm"># 2. 打印潜力股列表（按潜力评分降序）</span>
+<span class="cm"># 3. 询问是否继续深度分析（选 Y 继续 / 选 n 结束；加 --yes 跳过提问）</span>
+<span class="cm"># 4. 深度分析后输出最终推荐 Top 3（股票代码/名称/上涨潜力分数）</span>
+<span class="cm"># 5. 每只股票一行交易点位（阻力位/支撑位/建议买入价/建议卖出价）</span>
+<span class="cm"># 6. 每只推荐股落盘完整报告树：分节 Markdown + complete_report.md + 自包含 HTML</span>
+<span class="cm"># 数据源：筛选与深度分析全链路境内源（AKShare/BaoStock），不回退 Yahoo</span>
+
+<span class="cm"># 可选参数：</span>
+<span class="cm">#   --top N              推荐股票数量（默认 3）</span>
+<span class="cm">#   --workers N          并发分析数（默认 3，建议用 1 避免限流）</span>
+<span class="cm">#   --date YYYY-MM-DD    分析日期（默认今天）</span>
+<span class="cm">#   --save/--no-save     是否保存报告（默认保存）</span>
+<span class="cm">#   --html/--no-html     每只完整报告是否附带 HTML 页（默认生成）</span>
+<span class="cm">#   --max-candidates N   进入深度分析的潜力股上限（默认 50，按潜力评分截断）</span>
+<span class="cm">#   --yes                跳过交互确认（无人值守/定时任务用）</span>
+
+<span class="cm"># 示例：指定日期分析</span>
+<span class="fn">tradingagents</span> screener --top 3 --workers 1 --date 2026-11-09
+        </div>
+      </div>
+
+      <div class="tip">
+        <div class="tip-label">数据源优先级</div>
+        <p>技术指标链：<strong>BaoStock</strong>（免费无限流）→ AKShare 腾讯 → AKShare 新浪 → AKShare 东方财富；交易点位 K 线链：东方财富（前复权）→ 腾讯 → 新浪 → BaoStock。两条链都只走境内源、不访 Yahoo，源全部落空就记为无数据而不是丢候选。深度分析的数据路由也以 AKShare 优先（见 default_config 的 data_vendors）。</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">工作流程</span> 五步筛选漏斗 + 交互确认</h3>
+
+      <div class="flow">
+        <div class="flow-title">第一阶段：五步筛选漏斗</div>
+        <div class="flow-row">
+          <div class="flow-node green">第 1 步：获取股票池<br><small>AKShare 全 A 股 ~5200 只</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node blue">第 2 步：基础过滤<br><small>剔除 ST/科创板/北交所</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node orange">第 3 步：资金面预筛选<br><small>主力净流入>0 → 取前 100 只（盘前用最近交易日）</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node purple">第 4 步：消息面筛选<br><small>近一周有利好消息的板块</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node yellow">第 5 步：技术面筛选<br><small>RSI 30-65 · MA20 · MACD · 量比 → 几十只</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node teal">❓ 交互确认<br><small>打印潜力股列表，询问是否继续？（--yes 跳过）</small></div>
+        </div>
+        <div class="flow-arrow-down">▼ 选择「是」继续 / 选择「否」结束</div>
+        <div class="flow-title" style="margin-top: 16px;">第二阶段：深度分析找出 Top 3</div>
+        <div class="flow-row">
+          <div class="flow-node purple">第 6 步：多智能体深度分析<br><small>TradingAgents 分析引擎（每只 3-5 分钟）</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node yellow">第 7 步：综合评分排序<br><small>LLM 40% + 技术 30% + 资金 20% + 动量 10%</small></div>
+        </div>
+        <div class="flow-arrow-down">▼</div>
+        <div class="flow-row">
+          <div class="flow-node red">第 8 步：生成报告<br><small>最终推荐表格（代码/名称/上涨潜力分数）<br>交易点位（阻力/支撑/买卖价）<br>每只完整报告树落盘（分节 md + complete_report.html）</small></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <h3><span class="step-num">模块结构</span> 选股器代码架构</h3>
+
+      <table class="info-table">
+        <tr><th>文件</th><th>功能</th></tr>
+        <tr><td><code>screener/data_source.py</code></td><td>多源数据适配器，境内四源回退（BaoStock > 腾讯 > 新浪 > 东财），不访 Yahoo</td></tr>
+        <tr><td><code>screener/stock_universe.py</code></td><td>股票池获取，全 A 股 5000+ 只</td></tr>
+        <tr><td><code>screener/pre_screener_v2.py</code></td><td>多因子预筛选 ⭐，资金面/消息面/技术面筛选 + 潜力评分</td></tr>
+        <tr><td><code>screener/batch_analyzer.py</code></td><td>批量分析引擎，复用 TradingAgentsGraph</td></tr>
+        <tr><td><code>screener/scorer.py</code></td><td>综合评分排序，多因子加权计算</td></tr>
+        <tr><td><code>screener/price_levels.py</code></td><td>交易点位计算，阻力位/支撑位/建议买卖价</td></tr>
+        <tr><td><code>screener/a_stock_screener.py</code></td><td>A 股主脚本 ⭐，五步筛选漏斗完整流程编排</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  TradingAgents v0.7.1 · 傻瓜式学习指南 · 2026-11-06<br>
+  建议配合 architecture_diagram.html 和 architecture_full.html 一起阅读<br>
+  <small style="color:var(--green);">⭐ 内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
+</div>
+
+</body>
+</html>

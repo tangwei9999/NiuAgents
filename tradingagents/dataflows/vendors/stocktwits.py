@@ -23,11 +23,19 @@ from datetime import datetime
 from urllib.request import Request, urlopen
 
 from tradingagents.dataflows.date_window import coverage_gap, in_window
+from tradingagents.dataflows.net import (
+    SOCKET_TIMEOUT,
+    block_host,
+    is_connect_level_failure,
+    is_host_blocked,
+)
 from tradingagents.dataflows.symbols import crypto_base
 
 logger = logging.getLogger(__name__)
 
 _API = "https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
+# Parking is per host, not per symbol URL.
+_API_BASE = "https://api.stocktwits.com"
 _UA = "tradingagents/0.2 (+https://github.com/TauricResearch/TradingAgents)"
 
 
@@ -74,7 +82,7 @@ def _stocktwits_symbol(ticker: str) -> str:
 def fetch_stocktwits_messages(
     ticker: str,
     limit: int = 30,
-    timeout: float = 10.0,
+    timeout: float = SOCKET_TIMEOUT,
     start_date: str | None = None,
     end_date: str | None = None,
     screen=None,
@@ -95,6 +103,9 @@ def fetch_stocktwits_messages(
     caller never has to special-case None or exceptions.
     """
     url = _API.format(ticker=_stocktwits_symbol(ticker))
+    if is_host_blocked(_API_BASE):
+        # Unreachable from here already; logged once when the host was parked.
+        return "<stocktwits unavailable: host skipped as unreachable this run>"
     req = Request(url, headers={"User-Agent": _UA, "Accept": "application/json"})
     try:
         with urlopen(req, timeout=timeout) as resp:
@@ -102,6 +113,8 @@ def fetch_stocktwits_messages(
     except (OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
         # OSError covers URLError/TimeoutError/connection resets; HTTPException
         # covers chunked-transfer errors (IncompleteRead/BadStatusLine, #1024).
+        if is_connect_level_failure(exc):
+            block_host(_API_BASE, type(exc).__name__)
         logger.warning("StockTwits fetch failed for %s: %s", ticker, exc)
         return f"<stocktwits unavailable: {type(exc).__name__}>"
 

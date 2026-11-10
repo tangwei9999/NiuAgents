@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents 从 0 到 1 学习计划</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --green: #4ade80; --orange: #fb923c; --pink: #f472b6;
+    --purple: #a78bfa; --yellow: #fbbf24; --red: #f87171;
+    --teal: #2dd4bf;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; line-height: 1.7; }
+
+  .header { text-align: center; padding: 48px 20px 24px; position: relative; }
+  .header h1 { font-size: 2.4rem; background: linear-gradient(135deg, var(--accent), var(--purple), var(--pink)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px; }
+  .header p { color: var(--muted); font-size: 1rem; max-width: 600px; margin: 0 auto; }
+
+  /* Progress Bar */
+  .progress-bar { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  .progress-bar label { font-size: .85rem; color: var(--muted); white-space: nowrap; }
+  .progress-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 4px; transition: width .4s ease; width: 0%; }
+  .progress-count { font-size: .85rem; font-weight: 700; color: var(--accent); min-width: 50px; text-align: right; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* Phase */
+  .phase { margin-bottom: 40px; }
+  .phase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; cursor: pointer; user-select: none; }
+  .phase-number { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0; }
+  .phase-header h2 { font-size: 1.3rem; flex: 1; }
+  .phase-header .time-est { font-size: .8rem; color: var(--muted); background: var(--surface2); padding: 4px 12px; border-radius: 12px; white-space: nowrap; }
+  .phase-header .toggle { color: var(--muted); font-size: 1.2rem; transition: transform .2s; }
+  .phase-header.collapsed .toggle { transform: rotate(-90deg); }
+  .phase-body { overflow: hidden; transition: max-height .3s ease; }
+  .phase-body.collapsed { max-height: 0 !important; }
+
+  /* Step Card */
+  .step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 12px; transition: border-color .2s; }
+  .step:hover { border-color: var(--accent); }
+  .step-head { display: flex; align-items: flex-start; gap: 12px; }
+  .step-check { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; cursor: pointer; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+  .step-check.checked { background: var(--green); border-color: var(--green); }
+  .step-check.checked::after { content: '✓'; color: var(--bg); font-size: .8rem; font-weight: 800; }
+  .step-check.checked + .step-content .step-title { text-decoration: line-through; opacity: .6; }
+  .step-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .step-desc { font-size: .85rem; color: var(--muted); margin-bottom: 10px; }
+  .step-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .file-tag { font-size: .72rem; padding: 2px 10px; border-radius: 10px; background: rgba(56,189,248,.08); border: 1px solid rgba(56,189,248,.2); color: var(--accent); font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .step-keywords { display: flex; flex-wrap: wrap; gap: 6px; }
+  .keyword { font-size: .72rem; padding: 2px 8px; border-radius: 8px; background: rgba(255,255,255,.04); color: var(--muted); }
+
+  /* Phase Colors */
+  .phase-1 .phase-number { background: rgba(56,189,248,.15); color: var(--accent); }
+  .phase-2 .phase-number { background: rgba(74,222,128,.15); color: var(--green); }
+  .phase-3 .phase-number { background: rgba(251,146,60,.15); color: var(--orange); }
+  .phase-4 .phase-number { background: rgba(167,139,250,.15); color: var(--purple); }
+  .phase-5 .phase-number { background: rgba(244,114,182,.15); color: var(--pink); }
+  .phase-6 .phase-number { background: rgba(251,191,36,.15); color: var(--yellow); }
+
+  /* Resource Section */
+  .resources { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 40px; }
+  .resources h3 { font-size: 1.1rem; margin-bottom: 16px; color: var(--accent); }
+  .res-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .res-item { padding: 12px 16px; background: var(--surface2); border-radius: 8px; border: 1px solid var(--border); }
+  .res-item .res-type { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 4px; }
+  .res-item .res-title { font-size: .9rem; font-weight: 600; margin-bottom: 4px; }
+  .res-item .res-detail { font-size: .78rem; color: var(--muted); }
+  .res-item a { color: var(--accent); text-decoration: none; }
+  .res-item a:hover { text-decoration: underline; }
+
+  /* Tips */
+  .tips { background: linear-gradient(135deg, rgba(56,189,248,.08), rgba(167,139,250,.08)); border: 1px solid rgba(56,189,248,.2); border-radius: 12px; padding: 24px; margin-bottom: 40px; }
+  .tips h3 { color: var(--accent); margin-bottom: 12px; }
+  .tips ul { padding-left: 20px; }
+  .tips li { font-size: .88rem; color: var(--muted); margin-bottom: 6px; }
+  .tips li strong { color: var(--text); }
+
+  .footer { text-align: center; padding: 40px 20px; color: var(--muted); font-size: .8rem; border-top: 1px solid var(--border); }
+
+  @media (max-width: 640px) {
+    .header h1 { font-size: 1.6rem; }
+    .res-grid { grid-template-columns: 1fr; }
+    .phase-header .time-est { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar">
+  <label>学习进度</label>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  <span class="progress-count" id="progressCount">0 / 0</span>
+</div>
+
+<div class="header">
+  <h1>TradingAgents 从 0 到 1 学习计划</h1>
+  <p>6 个阶段，由浅入深掌握多智能体量化交易框架。勾选已完成步骤，进度自动保存。</p>
+</div>
+
+<div class="container">
+
+<!-- Tips -->
+<div class="tips">
+  <h3>学习建议</h3>
+  <ul>
+    <li><strong>前置知识：</strong>Python 基础、对 LLM / AI Agent 有初步了解即可</li>
+    <li><strong>实践优先：</strong>每个阶段都建议动手跑代码，不要只看文档</li>
+    <li><strong>环境准备：</strong>Python 3.11+、一个 LLM API Key（OpenAI / Google / Anthropic 任选）</li>
+    <li><strong>阅读顺序：</strong>先读 README → 再读架构图 → 然后按阶段推进</li>
+    <li><strong>遇到问题：</strong>查看 tests/ 目录下的测试用例，它们是最好的使用示例</li>
+  </ul>
+</div>
+
+<!-- ==================== Phase 1 ==================== -->
+<div class="phase phase-1">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number">1</div>
+    <h2>环境搭建 & 项目初探</h2>
+    <span class="time-est">约 1-2 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">1.1 阅读 README.md，建立全局认知</div>
+          <div class="step-desc">了解项目定位（多智能体 LLM 交易框架）、支持的市场、核心功能（分析→辩论→决策→回测）。重点看架构图和智能体角色说明。</div>
+          <div class="step-files"><span class="file-tag">README.md</span></div>
+          <div class="step-keywords"><span class="keyword">项目定位</span><span class="keyword">功能概览</span><span class="keyword">市场支持</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">1.2 搭建 Python 环境并安装依赖</div>
+          <div class="step-desc">创建 Python 3.11+ 虚拟环境，pip install . 安装项目。配置 .env 文件，至少填入一个 LLM API Key（如 OPENAI_API_KEY）。</div>
+          <div class="step-files"><span class="file-tag">pyproject.toml</span><span class="file-tag">.env.example</span><span class="file-tag">requirements.txt</span></div>
+          <div class="step-keywords"><span class="keyword">pip install</span><span class="keyword">.env 配置</span><span class="keyword">API Key</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">1.3 运行第一次 CLI 交互</div>
+          <div class="step-desc">执行 tradingagents 命令，跟着交互式问答走一遍完整流程：选 ticker → 选日期 → 选 LLM → 查看分析结果。感受 CLI 的工作方式。</div>
+          <div class="step-files"><span class="file-tag">cli/main.py</span><span class="file-tag">cli/run.py</span></div>
+          <div class="step-keywords"><span class="keyword">tradingagents CLI</span><span class="keyword">交互式问答</span><span class="keyword">首次运行</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">1.4 用 main.py 脚本跑一次程序</div>
+          <div class="step-desc">直接运行 python main.py，用代码方式触发一次 NVDA 分析。观察控制台输出的 debug 日志，理解 propagate() 的调用方式。</div>
+          <div class="step-files"><span class="file-tag">main.py</span><span class="file-tag">TradingAgents/__init__.py</span></div>
+          <div class="step-keywords"><span class="keyword">脚本运行</span><span class="keyword">propagate()</span><span class="keyword">debug 日志</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">1.5 浏览项目目录结构</div>
+          <div class="step-desc">花 10 分钟浏览项目树，建立文件位置感：TradingAgents/ 是核心包，cli/ 是命令行，tests/ 是测试，dataflows/ 是数据层。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/</span><span class="file-tag">cli/</span><span class="file-tag">tests/</span></div>
+          <div class="step-keywords"><span class="keyword">目录结构</span><span class="keyword">模块划分</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 2 ==================== -->
+<div class="phase phase-2">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number">2</div>
+    <h2>配置体系 & 数据流</h2>
+    <span class="time-est">约 2-3 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">2.1 理解三层配置加载链</div>
+          <div class="step-desc">阅读 default_config.py，理解：硬编码默认值 → TRADINGAGENTS_* 环境变量覆盖 → 运行时 config dict 覆盖。重点看 _ENV_OVERRIDES 字典和 _coerce() 类型转换。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/default_config.py</span></div>
+          <div class="step-keywords"><span class="keyword">DEFAULT_CONFIG</span><span class="keyword">环境变量</span><span class="keyword">类型转换</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">2.2 掌握数据供应商路由机制</div>
+          <div class="step-desc">阅读 router.py，理解 route_to_vendor() 如何按 data_vendors 配置路由请求，fallback 链如何工作，以及 NO_DATA_AVAILABLE / DATA_UNAVAILABLE 哨兵值。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/dataflows/router.py</span><span class="file-tag">TradingAgents/dataflows/errors.py</span></div>
+          <div class="step-keywords"><span class="keyword">route_to_vendor</span><span class="keyword">fallback 链</span><span class="keyword">错误哨兵</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">2.3 理解 Point-in-Time 日期窗口</div>
+          <div class="step-desc">阅读 date_window.py，理解 as_of() 和 as_of_window() 如何防止 look-ahead 偏差——历史分析只使用截至分析日期的数据。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/dataflows/date_window.py</span></div>
+          <div class="step-keywords"><span class="keyword">as_of</span><span class="keyword">look-ahead 防护</span><span class="keyword">历史数据</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">2.4 阅读 agents/tools.py 中的工具函数</div>
+          <div class="step-desc">了解分析师可调用的所有 @tool 函数：get_stock_data、get_indicators、get_fundamentals、get_news 等。注意 InjectedState 如何自动注入 trade_date。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/tools.py</span></div>
+          <div class="step-keywords"><span class="keyword">@tool</span><span class="keyword">InjectedState</span><span class="keyword">工具函数</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 3 ==================== -->
+<div class="phase phase-3">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number">3</div>
+    <h2>智能体系统深入</h2>
+    <span class="time-est">约 3-4 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">3.1 阅读 AgentState 状态模型</div>
+          <div class="step-desc">理解 state.py 中 AgentState 的所有字段：报告字段、辩论状态、决策输出。这是贯穿整个图的数据载体。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/state.py</span></div>
+          <div class="step-keywords"><span class="keyword">AgentState</span><span class="keyword">InvestDebateState</span><span class="keyword">RiskDebateState</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">3.2 研究一个分析师的实现</div>
+          <div class="step-desc">选 market_analyst.py 深入阅读，理解：系统 prompt 设计、工具绑定、报告输出格式。然后快速浏览其他 3 个分析师的差异。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/analysts/market_analyst.py</span><span class="file-tag">TradingAgents/agents/analysts/news_analyst.py</span><span class="file-tag">TradingAgents/agents/analysts/sentiment_analyst.py</span><span class="file-tag">TradingAgents/agents/analysts/fundamentals_analyst.py</span></div>
+          <div class="step-keywords"><span class="keyword">系统 prompt</span><span class="keyword">工具绑定</span><span class="keyword">报告格式</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">3.3 理解多空辩论机制</div>
+          <div class="step-desc">阅读 bull_researcher.py 和 bear_researcher.py，理解结构化辩论：Bull → Bear → Bull → ... 循环 max_debate_rounds 轮，然后 Research Manager 综合。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/researchers/bull_researcher.py</span><span class="file-tag">TradingAgents/agents/researchers/bear_researcher.py</span><span class="file-tag">TradingAgents/agents/managers/research_manager.py</span></div>
+          <div class="step-keywords"><span class="keyword">多空辩论</span><span class="keyword">轮数控制</span><span class="keyword">综合研判</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">3.4 理解风控三方辩论 & 组合经理决策</div>
+          <div class="step-desc">阅读 risk_mgmt/ 下三个辩论员和 managers/portfolio_manager.py。理解 Aggressive → Conservative → Neutral 循环，最终由 Portfolio Manager 输出 5 级评级。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/risk_mgmt/</span><span class="file-tag">TradingAgents/agents/managers/portfolio_manager.py</span><span class="file-tag">TradingAgents/agents/rating.py</span></div>
+          <div class="step-keywords"><span class="keyword">三方辩论</span><span class="keyword">5 级评级</span><span class="keyword">REVIEW 哨兵</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">3.5 阅读 rating.py 评级解析逻辑</div>
+          <div class="step-desc">理解 extract_rating() 如何从 LLM 自由文本中解析出 Buy/Overweight/Hold/Underweight/Sell，以及 REVIEW 哨兵值的用途。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/agents/rating.py</span></div>
+          <div class="step-keywords"><span class="keyword">正则解析</span><span class="keyword">NFKC 标准化</span><span class="keyword">评级提取</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 4 ==================== -->
+<div class="phase phase-4">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number">4</div>
+    <h2>LangGraph 图编排引擎</h2>
+    <span class="time-est">约 3-4 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">4.1 理解 GraphSetup.setup_graph() 图构建</div>
+          <div class="step-desc">这是整个框架的核心：节点注册（每个智能体是一个节点）、边连接（START → 分析师并行 → 辩论 → 交易 → 风控 → 审批 → END）、条件路由。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/graph/setup.py</span></div>
+          <div class="step-keywords"><span class="keyword">StateGraph</span><span class="keyword">节点注册</span><span class="keyword">边连接</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">4.2 理解 ConditionalLogic 条件路由</div>
+          <div class="step-desc">should_continue_debate() 控制多空辩论轮数和发言顺序；should_continue_risk_analysis() 控制风控三方轮转。理解返回值如何映射到 DEBATE_PATH_MAP。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/graph/conditional_logic.py</span></div>
+          <div class="step-keywords"><span class="keyword">条件边</span><span class="keyword">轮数控制</span><span class="keyword">发言顺序</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">4.3 理解分析师并行调度</div>
+          <div class="step-desc">阅读 analyst_execution.py 和 setup.py 中的并行边（first_steps → Bull Researcher）。每个分析师有自己的子图（_analyst_graph），独立管理工具调用轮数。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/graph/analyst_execution.py</span></div>
+          <div class="step-keywords"><span class="keyword">并行执行</span><span class="keyword">子图</span><span class="keyword">max_tool_rounds</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">4.4 理解 TradingAgentsGraph.propagate() 完整链路</div>
+          <div class="step-desc">这是主入口：验证日期 → 解析公司身份 → 创建初始状态 → 检查点作用域 → 执行图 → 记录决策 → 返回评级。理解 stream_run() 的流式输出。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/graph/trading_graph.py</span><span class="file-tag">TradingAgents/graph/propagation.py</span></div>
+          <div class="step-keywords"><span class="keyword">propagate</span><span class="keyword">stream_run</span><span class="keyword">完整链路</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">4.5 理解检查点恢复机制</div>
+          <div class="step-desc">阅读 checkpointer.py，理解 SQLite 检查点如何保存/恢复/清除。_run_signature() 如何保证配置变更时旧检查点自动失效。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/graph/checkpointer.py</span></div>
+          <div class="step-keywords"><span class="keyword">SQLite</span><span class="keyword">thread_id</span><span class="keyword">签名失效</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 5 ==================== -->
+<div class="phase phase-5">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number">5</div>
+    <h2>记忆系统 & 回测引擎</h2>
+    <span class="time-est">约 2-3 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">5.1 理解决策日志格式与读写</div>
+          <div class="step-desc">阅读 memory/log.py，理解 TradingMemoryLog 的 append-only Markdown 格式：tag 行 + DECISION 段 + REFLECTION 段。掌握 store_decision() 和 load_entries()。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/memory/log.py</span></div>
+          <div class="step-keywords"><span class="keyword">Markdown 日志</span><span class="keyword">幂等写入</span><span class="keyword">原子替换</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">5.2 理解结算流程与反思生成</div>
+          <div class="step-desc">阅读 settlement.py：fetch_returns() 计算实际回报和 alpha → Reflector 生成反思段落 → update_with_outcome() 写回日志。理解 point-in-time resolved date 过滤。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/memory/settlement.py</span><span class="file-tag">TradingAgents/memory/reflection.py</span></div>
+          <div class="step-keywords"><span class="keyword">fetch_returns</span><span class="keyword">alpha 回报</span><span class="keyword">反思生成</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">5.3 运行一次回测</div>
+          <div class="step-desc">用 CLI 或代码运行 backtest：tradingagents backtest NVDA,AAPL --start 2026-06-01 --end 2026-08-01 --every 7。理解网格生成、独立记忆日志、中断恢复。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/backtest.py</span></div>
+          <div class="step-keywords"><span class="keyword">iter_grid</span><span class="keyword">run_backtest</span><span class="keyword">summarize</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">5.4 理解回测评分机制</div>
+          <div class="step-desc">阅读 BacktestSummary：按评级分组统计 hit_rate（方向命中率）和 mean_alpha（平均超额回报）。理解 _DIRECTION 映射和 REVIEW 不计分逻辑。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/backtest.py</span></div>
+          <div class="step-keywords"><span class="keyword">hit_rate</span><span class="keyword">mean_alpha</span><span class="keyword">评级分组</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 6 ==================== -->
+<div class="phase phase-6">
+  <div class="phase-header" onclick="togglePhase(this)\)">
+    <div class="phase-number">6</div>
+    <h2>进阶：LLM 层 & 生产化</h2>
+    <span class="time-est">约 2-3 小时</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.1 理解 LLM 客户端工厂与双 Tier</div>
+          <div class="step-desc">阅读 factory.py：create_tier_client() 按 config 创建 quick/deep 两个客户端。理解 tier_provider() 如何决定每个 tier 使用哪个 provider。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/llm_clients/factory.py</span></div>
+          <div class="step-keywords"><span class="keyword">双 Tier</span><span class="keyword">工厂模式</span><span class="keyword">provider 路由</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.2 了解模型目录与能力检测</div>
+          <div class="step-desc">阅读 model_catalog.py 和 capabilities.py，理解系统如何知道某个模型是否支持 temperature / max_tokens / reasoning effort 等能力。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/llm_clients/model_catalog.py</span><span class="file-tag">TradingAgents/llm_clients/capabilities.py</span></div>
+          <div class="step-keywords"><span class="keyword">模型目录</span><span class="keyword">能力检测</span><span class="keyword">reasoning</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.3 了解 ChatGPT 订阅认证</div>
+          <div class="step-desc">阅读 chatgpt_auth.py，理解如何用 ChatGPT Plus/Pro 订阅代替 API Key 运行。了解 OAuth 登录流程和 token 持久化。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/llm_clients/chatgpt_auth.py</span></div>
+          <div class="step-keywords"><span class="keyword">ChatGPT 订阅</span><span class="keyword">OAuth</span><span class="keyword">token 持久化</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.4 了解报告输出系统</div>
+          <div class="step-desc">阅读 reporting.py 和 report_html.py，理解运行结束后如何生成文本报告和单页 HTML 报告。了解 save_reports() 的调用方式。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/reporting.py</span><span class="file-tag">TradingAgents/report_html.py</span></div>
+          <div class="step-keywords"><span class="keyword">报告生成</span><span class="keyword">HTML</span><span class="keyword">save_reports</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.5 跑通测试套件</div>
+          <div class="step-desc">运行 pytest 查看测试如何通过。重点看 test_graph_end_to_end.py、test_backtest.py、test_structured_agents.py 等核心测试，它们是最佳使用示例。</div>
+          <div class="step-files"><span class="file-tag">tests/</span></div>
+          <div class="step-keywords"><span class="keyword">pytest</span><span class="keyword">端到端测试</span><span class="keyword">使用示例</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title">6.6 尝试自定义配置与扩展</div>
+          <div class="step-desc">尝试：换不同 LLM provider、调整辩论轮数、传入 portfolio 持仓、使用 Ollama 本地模型。理解 config 的每个字段如何影响运行行为。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/default_config.py</span><span class="file-tag">TradingAgents/portfolio.py</span></div>
+          <div class="step-keywords"><span class="keyword">自定义配置</span><span class="keyword">持仓注入</span><span class="keyword">本地模型</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Phase 7: Stock Screener ⭐ ==================== -->
+<div class="phase phase-2" style="border: 2px solid var(--green); border-radius: 12px; padding: 8px;">
+  <div class="phase-header" onclick="togglePhase(this)">
+    <div class="phase-number" style="background: var(--green);">⭐</div>
+    <h2 style="color: var(--green);">新增：内置选股器 — 五步筛选 + 交互确认，智能推荐 Top 3</h2>
+    <span class="time-est">约 30 分钟上手</span>
+    <span class="toggle">▼</span>
+  </div>
+  <div class="phase-body">
+
+    <div class="step" style="border-color: rgba(74,222,128,.3);">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title" style="color: var(--green);">⭐.1 了解内置选股器功能</div>
+          <div class="step-desc">选股器采用<strong>五步筛选漏斗</strong>：股票池→基础过滤（剔除 ST/科创板/北交所）→资金面前 100→消息面利好板块→技术面筛选，找出几十只潜力股；交互确认后深度分析推荐 Top 3。技术指标数据源：BaoStock > AKShare 腾讯 > AKShare 新浪 > AKShare 东方财富（全境内链，不访 Yahoo）。</div>
+          <div class="step-files"><span class="file-tag">TradingAgents/screener/</span></div>
+          <div class="step-keywords"><span class="keyword">全市场扫描</span><span class="keyword">五步筛选</span><span class="keyword">AKShare</span><span class="keyword">潜力评分</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="border-color: rgba(74,222,128,.3);">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title" style="color: var(--green);">⭐.2 运行第一次选股</div>
+          <div class="step-desc">先执行 <code>.\.venv\Scripts\activate.bat</code> 激活虚拟环境，然后执行 <code>tradingagents screener --top 3 --workers 1</code> 运行选股器。观察控制台的五步漏斗：股票池→基础过滤→资金面前 100→消息面利好板块→技术面筛选，随后<strong>打印潜力股列表并询问是否继续</strong>（选「否」结束，选「是」进入深度分析，<code>--yes</code> 可跳过提问），深度分析完成后以表格输出<strong>最终推荐 Top 3</strong>（股票代码、名称、上涨潜力分数、综合评级），并附每只股票一行的<strong>交易点位建议</strong>（阻力位、支撑位、建议买入价、建议卖出价）；每只推荐股的完整报告树落盘到 <code>~/.tradingagents/logs/screener/&lt;date&gt;/</code>（分节 md + complete_report.md/html）。</div>
+          <div class="step-files"><span class="file-tag">cli/main.py</span><span class="file-tag">screener/a_stock_screener.py</span></div>
+          <div class="step-keywords"><span class="keyword">tradingagents screener</span><span class="keyword">Top 3 推荐</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="border-color: rgba(74,222,128,.3);">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title" style="color: var(--green);">⭐.3 理解选股器工作流程</div>
+          <div class="step-desc">阅读 screener/ 目录下的模块：data_source.py（多源数据适配）、stock_universe.py（股票池获取）、pre_screener_v2.py（多因子预筛选 ⭐）、batch_analyzer.py（批量分析）、scorer.py（综合评分）。</div>
+          <div class="step-files"><span class="file-tag">screener/data_source.py</span><span class="file-tag">screener/pre_screener_v2.py</span><span class="file-tag">screener/scorer.py</span></div>
+          <div class="step-keywords"><span class="keyword">模块结构</span><span class="keyword">数据适配</span><span class="keyword">评分排序</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="border-color: rgba(74,222,128,.3);">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title" style="color: var(--green);">⭐.4 查看选股器报告</div>
+          <div class="step-desc">打开 <code>~/.tradingagents/logs/screener/&lt;date&gt;/</code> 目录：topN_代码_名称.md 是摘要，每股代码子目录里有 12 个分节报告与 complete_report.md/html，对照理解 Top 3 推荐股票的评分细节（潜力评分+LLM 评级）和分析理由。</div>
+          <div class="step-files"><span class="file-tag">~/.tradingagents/logs/screener/</span></div>
+          <div class="step-keywords"><span class="keyword">报告查看</span><span class="keyword">评分细节</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="border-color: rgba(74,222,128,.3);">
+      <div class="step-head">
+        <div class="step-check" onclick="toggleCheck(this, event)"></div>
+        <div class="step-content">
+          <div class="step-title" style="color: var(--green);">⭐.5 调整选股器参数</div>
+          <div class="step-desc">尝试不同参数：<code>--workers 2</code> 控制并发数，<code>--date 2026-11-01</code> 指定历史日期，<code>--max-candidates</code> 限制深度分析数量，<code>--yes</code> 跳过确认。观察不同参数对筛选结果的影响。</div>
+          <div class="step-files"><span class="file-tag">screener/a_stock_screener.py</span></div>
+          <div class="step-keywords"><span class="keyword">参数调整</span><span class="keyword">并发控制</span><span class="keyword">历史分析</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Resources ==================== -->
+<div class="resources">
+  <h3>学习资源</h3>
+  <div class="res-grid">
+    <div class="res-item">
+      <div class="res-type" style="color:var(--accent);">论文</div>
+      <div class="res-title">TradingAgents: Multi-Agents LLM Financial Trading Framework</div>
+      <div class="res-detail"><a href="https://arxiv.org/abs/2412.20138">arXiv: 2412.20138</a> — 原始论文，理解设计动机和理论基础</div>
+    </div>
+    <div class="res-item">
+      <div class="res-type" style="color:var(--green);">框架</div>
+      <div class="res-title">LangGraph 官方文档</div>
+      <div class="res-detail"><a href="https://langchain-ai.github.io/langgraph/">langchain-ai.github.io/langgraph</a> — 理解 StateGraph、条件边、检查点等核心概念</div>
+    </div>
+    <div class="res-item">
+      <div class="res-type" style="color:var(--orange);">代码</div>
+      <div class="res-title">tests/ 目录</div>
+      <div class="res-detail">100+ 测试文件是最好的使用示例，特别是 test_graph_end_to_end.py 和 test_backtest.py</div>
+    </div>
+    <div class="res-item">
+      <div class="res-type" style="color:var(--purple);">视频</div>
+      <div class="res-title">Demo 视频</div>
+      <div class="res-detail"><a href="https://www.youtube.com/watch?v=90gr5lwjIho">YouTube Demo</a> — 直观了解 CLI 运行效果和输出格式</div>
+    </div>
+    <div class="res-item">
+      <div class="res-type" style="color:var(--pink);">数据</div>
+      <div class="res-title">SEC EDGAR 文档</div>
+      <div class="res-detail">理解 point-in-time 财报数据来源，以及为什么 filed date 比 period date 更重要</div>
+    </div>
+    <div class="res-item">
+      <div class="res-type" style="color:var(--yellow);">社区</div>
+      <div class="res-title">Discord 社区</div>
+      <div class="res-detail"><a href="https://discord.com/invite/hk9PGKShPK">TradingResearch Discord</a> — 提问和交流</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  TradingAgents v0.7.1 · Learning Plan · Generated 2026-11-06<br>
+  学习进度自动保存在浏览器 localStorage 中<br>
+  <small style="color:var(--green);">⭐ 内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
+</div>
+
+<script>
+const STORAGE_KEY = 'tradingagents-learning-progress';
+
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveProgress(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function updateProgressBar() {
+  const all = document.querySelectorAll('.step-check');
+  const checked = document.querySelectorAll('.step-check.checked');
+  const total = all.length;
+  const done = checked.length;
+  document.getElementById('progressCount').textContent = `${done} / ${total}`;
+  document.getElementById('progressFill').style.width = total ? `${(done / total * 100).toFixed(1)}%` : '0%';
+}
+
+function toggleCheck(el, event) {
+  event.stopPropagation();
+  el.classList.toggle('checked');
+  // Save
+  const progress = loadProgress();
+  const steps = document.querySelectorAll('.step-check');
+  steps.forEach((step, i) => { progress[i] = step.classList.contains('checked'); });
+  saveProgress(progress);
+  updateProgressBar();
+}
+
+function togglePhase(headerEl) {
+  const body = headerEl.nextElementSibling;
+  const isCollapsed = body.classList.contains('collapsed');
+  if (isCollapsed) {
+    body.classList.remove('collapsed');
+    body.style.maxHeight = body.scrollHeight + 'px';
+    headerEl.classList.remove('collapsed');
+  } else {
+    body.style.maxHeight = body.scrollHeight + 'px';
+    requestAnimationFrame(() => { body.style.maxHeight = '0px'; });
+    body.classList.add('collapsed');
+    headerEl.classList.add('collapsed');
+  }
+}
+
+// Restore progress on load
+document.addEventListener('DOMContentLoaded', () => {
+  const progress = loadProgress();
+  const steps = document.querySelectorAll('.step-check');
+  steps.forEach((step, i) => {
+    if (progress[i]) step.classList.add('checked');
+  });
+  updateProgressBar();
+
+  // Set initial max-height for open phases
+  document.querySelectorAll('.phase-body').forEach(body => {
+    if (!body.classList.contains('collapsed')) {
+      body.style.maxHeight = body.scrollHeight + 'px';
+    }
+  });
+});
+</script>
+
+</body>
+</html>

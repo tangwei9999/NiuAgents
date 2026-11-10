@@ -31,6 +31,11 @@ _ENV_OVERRIDES = {
     "TRADINGAGENTS_GOOGLE_THINKING_LEVEL":   "google_thinking_level",
     "TRADINGAGENTS_OPENAI_REASONING_EFFORT": "openai_reasoning_effort",
     "TRADINGAGENTS_ANTHROPIC_EFFORT":        "anthropic_effort",
+    # Screener configuration
+    "TRADINGAGENTS_SCREENER_MAX_CANDIDATES": "screener_max_candidates",
+    "TRADINGAGENTS_SCREENER_CONCURRENCY":    "screener_concurrency",
+    "TRADINGAGENTS_SCREENER_RSI_MIN":        "screener_rsi_min",
+    "TRADINGAGENTS_SCREENER_RSI_MAX":        "screener_rsi_max",
 }
 
 
@@ -155,19 +160,32 @@ def build_default_config() -> dict:
         # The configured value is the exact vendor chain — requests are NOT silently
         # routed to vendors you didn't choose. For ordered fallback, list several,
         # e.g. "yfinance,alpha_vantage". "default" uses all available vendors.
+        # AKShare is prioritized for A-share stocks (.SS/.SZ) as it provides better
+        # coverage and is less prone to rate limiting for Chinese markets.
         "data_vendors": {
-            "core_stock_apis": "yfinance",       # Options: alpha_vantage, yfinance
-            "technical_indicators": "yfinance",  # Options: alpha_vantage, yfinance
-            # Statements come from SEC EDGAR as filed (US filers), then Yahoo; the
-        # overview and insider tools, which SEC EDGAR does not serve, from Yahoo.
-        "fundamental_data": "sec_edgar,yfinance",  # Options: sec_edgar, alpha_vantage, yfinance
-            "news_data": "yfinance",             # Options: alpha_vantage, yfinance
-            "macro_data": "fred",                # Options: fred (needs FRED_API_KEY)
-            "prediction_markets": "polymarket",  # Options: polymarket (keyless)
+            "core_stock_apis": "akshare,yfinance",       # AKShare first for A-shares
+            "technical_indicators": "akshare,yfinance",  # AKShare first for A-shares
+            # Statements come from SEC EDGAR as filed (US filers), then AKShare and
+            # Yahoo; the overview and insider tools, which SEC EDGAR does not serve,
+            # from the rest of the chain.
+            "fundamental_data": "sec_edgar,akshare,yfinance",  # AKShare added for A-shares
+            "news_data": "akshare,yfinance",             # AKShare first for A-shares
+            "macro_data": "fred",                # Options: fred (needs FRED_API_KEY), or "none" to skip
+            # Polymarket prices narrative events (Fed, recession, elections) and
+            # is offshore; "sse_option" is the domestic stand-in, which prices
+            # where a broad index closes at expiry rather than an event, so it is
+            # the chain for a China-only run (the A-share batch sets it) and would
+            # hand a US analysis Shanghai odds if left in front of Polymarket.
+            "prediction_markets": "polymarket",  # Options: polymarket, sse_option, or "none" to skip
         },
         # Tool-level configuration (takes precedence over category-level)
         "tool_vendors": {
             # Example: "get_stock_data": "alpha_vantage",  # Override category default
+            # Per-stock news prefers AKShare (A-share coverage), but AKShare's
+            # "global" news is the Chinese press. Keep the market-wide view on
+            # Yahoo so a US-listed analysis is not handed Shanghai headlines as
+            # its global context; an A-share run overrides this to "akshare".
+            "get_global_news": "yfinance",
         },
         # Benchmark for alpha calculation in the reflection layer.
         # ``benchmark_ticker`` (when set) overrides the suffix map for all
@@ -202,6 +220,17 @@ def build_default_config() -> dict:
             ".SA":  "^BVSP",       # B3 Brazil (Ibovespa)
             "":     "SPY",         # default for US-listed tickers (no suffix)
         },
+        # Screener configuration (A-share stock screener)
+        "screener_max_candidates": 50,     # max stocks to analyze in depth
+        "screener_min_volume_ratio": 1.0,  # min volume ratio for pre-screening
+        "screener_rsi_min": 40,            # min RSI for pre-screening
+        "screener_rsi_max": 70,            # max RSI for pre-screening
+        "screener_concurrency": 3,         # max concurrent analyses
+        # Screener scoring weights (must sum to 1.0)
+        "screener_weight_rating": 0.40,    # LLM rating weight
+        "screener_weight_technical": 0.30, # technical indicators weight
+        "screener_weight_volume": 0.20,    # volume/money flow weight
+        "screener_weight_momentum": 0.10,  # momentum weight
 
     })
 

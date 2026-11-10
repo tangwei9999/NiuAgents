@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradingAgents — 技术架构 & 业务架构</title>
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #fff; --border: #e0e0e0;
+    --primary: #b71c1c; --primary-light: #f8d7da; --primary-bg: #fce4ec;
+    --accent: #1565c0; --accent-light: #bbdefb; --accent-bg: #e3f2fd;
+    --text: #212121; --muted: #616161; --white: #fff;
+    --shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif; line-height: 1.5; }
+
+  .page { max-width: 1440px; margin: 0 auto; padding: 30px 40px; }
+
+  /* ===== Section Header ===== */
+  .section-header { margin-bottom: 24px; }
+  .section-header h1 { font-size: 1.8rem; color: var(--accent); font-weight: 800; }
+  .section-header .subtitle { font-size: .9rem; color: var(--muted); margin-top: 4px; }
+
+  /* ===== Layer Row ===== */
+  .layer-row { display: flex; align-items: stretch; margin-bottom: 0; }
+  .layer-label { width: 100px; min-width: 100px; display: flex; align-items: center; justify-content: center; font-size: 1rem; font-weight: 800; color: var(--white); writing-mode: horizontal-tb; text-align: center; padding: 12px 8px; }
+  .layer-content { flex: 1; padding: 12px 16px; border-left: 3px dashed var(--primary); position: relative; }
+  .layer-row + .layer-row .layer-content { border-top: 3px dashed var(--primary); }
+
+  /* Layer colors */
+  .layer-user .layer-label { background: var(--primary); }
+  .layer-web .layer-label { background: #c62828; }
+  .layer-gateway .layer-label { background: #d32f2f; }
+  .layer-service .layer-label { background: #e53935; }
+  .layer-data .layer-label { background: #ef5350; }
+  .layer-infra .layer-label { background: #f44336; }
+  .layer-integration .layer-label { background: var(--accent); }
+
+  /* ===== Blocks ===== */
+  .block-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .block-row:last-child { margin-bottom: 0; }
+
+  .block { padding: 8px 16px; border-radius: 6px; font-size: .82rem; font-weight: 600; text-align: center; white-space: nowrap; }
+  .block-primary { background: var(--primary); color: var(--white); }
+  .block-primary-light { background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary); }
+  .block-accent { background: var(--accent); color: var(--white); }
+  .block-accent-light { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+  .block-gray { background: #9e9e9e; color: var(--white); }
+  .block-gray-light { background: #e0e0e0; color: #424242; border: 1px solid #bdbdbd; }
+  .block-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+  .block-outline-blue { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+
+  .block-wide { flex: 1; min-width: 200px; }
+  .block-full { width: 100%; }
+
+  .block small { display: block; font-weight: 400; font-size: .7rem; opacity: .8; margin-top: 1px; }
+
+  /* ===== Integration Panel ===== */
+  .integration-panel { width: 200px; min-width: 200px; border: 2px dashed var(--accent); border-radius: 8px; padding: 12px; margin-left: 16px; align-self: stretch; }
+  .integration-panel h3 { font-size: .85rem; color: var(--accent); text-align: center; margin-bottom: 10px; font-weight: 700; }
+  .integration-panel .int-block { display: block; width: 100%; padding: 6px 10px; border-radius: 5px; font-size: .75rem; font-weight: 600; text-align: center; margin-bottom: 6px; }
+  .integration-panel .int-block:last-child { margin-bottom: 0; }
+  .int-block.red { background: var(--primary); color: var(--white); }
+  .int-block.blue { background: var(--accent); color: var(--white); }
+  .int-block.red-light { background: var(--primary-light); color: var(--primary); }
+
+  /* ===== Data Layer Icons ===== */
+  .data-store { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; background: var(--primary-bg); border: 1px solid var(--primary); font-size: .82rem; font-weight: 600; color: var(--primary); }
+  .data-store .icon { font-size: 1.1rem; }
+  .data-store small { display: block; font-weight: 400; font-size: .68rem; color: var(--muted); }
+
+  /* ===== Divider ===== */
+  .divider { height: 40px; }
+
+  /* ===== Business Architecture ===== */
+  .biz-grid { display: grid; grid-template-columns: 80px 1fr; gap: 0; margin-bottom: 30px; }
+  .biz-sidebar { background: var(--primary); color: var(--white); font-size: 1.1rem; font-weight: 800; writing-mode: vertical-rl; text-orientation: mixed; display: flex; align-items: center; justify-content: center; padding: 20px 10px; letter-spacing: 4px; border-radius: 8px 0 0 8px; }
+  .biz-main { background: var(--card); border: 1px solid var(--border); border-radius: 0 8px 8px 0; padding: 20px; }
+
+  .biz-category { margin-bottom: 20px; }
+  .biz-category:last-child { margin-bottom: 0; }
+  .biz-category-title { font-size: .9rem; font-weight: 700; color: var(--primary); text-align: center; padding: 6px 0; margin-bottom: 10px; background: var(--primary-bg); border-radius: 6px; }
+
+  .biz-modules { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .biz-module { padding: 8px 18px; border-radius: 6px; font-size: .82rem; font-weight: 600; text-align: center; }
+  .biz-module.red { background: var(--primary); color: var(--white); }
+  .biz-module.red-light { background: var(--primary-light); color: var(--primary); border: 1px solid var(--primary); }
+  .biz-module.accent { background: var(--accent); color: var(--white); }
+  .biz-module.accent-light { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+
+  .biz-foundation { margin-top: 20px; }
+  .biz-foundation .biz-sidebar { background: #424242; }
+  .biz-foundation .biz-category-title { background: #f5f5f5; color: #424242; }
+
+  /* ===== Tab Navigation ===== */
+  .tab-nav { display: flex; gap: 0; margin-bottom: 30px; border-bottom: 3px solid var(--border); }
+  .tab-btn { padding: 12px 28px; font-size: 1rem; font-weight: 700; cursor: pointer; border: none; background: transparent; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -3px; transition: all .2s; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover { color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 900px) {
+    .page { padding: 16px; }
+    .integration-panel { display: none; }
+    .layer-label { width: 70px; min-width: 70px; font-size: .85rem; }
+    .biz-grid { grid-template-columns: 50px 1fr; }
+    .biz-sidebar { font-size: .9rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<!-- Tab Navigation -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('tech')">2.2 技术架构</button>
+  <button class="tab-btn" onclick="switchTab('biz')">2.1 业务架构</button>
+</div>
+
+<!-- ==================== 技术架构 ==================== -->
+<div id="tab-tech" class="tab-panel active">
+
+  <div class="section-header">
+    <h1>2.2 技术架构</h1>
+    <div class="subtitle">TradingAgents v0.7.1 · Multi-Agents LLM Financial Trading Framework</div>
+  </div>
+
+  <!-- 用户层 -->
+  <div class="layer-row layer-user">
+    <div class="layer-label">用户层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="block block-primary">CLI 终端</div>
+        <div class="block block-primary">浏览器</div>
+        <div class="block block-primary">Python 脚本</div>
+        <div class="block block-primary">Docker 容器</div>
+        <div class="block block-primary">定时调度</div>
+        <div class="block" style="background:var(--green);color:var(--white);">内置选股器 ⭐</div>
+      </div>
+    </div>
+    <div class="integration-panel">
+      <h3>集成平台</h3>
+      <div class="int-block red">20+ LLM 提供商</div>
+      <div class="int-block red">BaoStock + AKShare 四大境内源 ⭐</div>
+      <div class="int-block red">Yahoo Finance</div>
+      <div class="int-block red">SEC EDGAR</div>
+      <div class="int-block red">FRED 宏观数据</div>
+      <div class="int-block red">Polymarket</div>
+      <div class="int-block red">Reddit</div>
+      <div class="int-block red">StockTwits</div>
+      <div class="int-block red">Alpha Vantage</div>
+      <div class="int-block red">TypeSafe Jev</div>
+    </div>
+  </div>
+
+  <!-- Web层 -->
+  <div class="layer-row layer-web">
+    <div class="layer-label">交互层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="block block-primary-light block-wide">cli/main.py · Typer CLI 交互界面<small>Rich 渲染 · Questionary 问答 · 偏好持久化 · screener 子命令</small></div>
+        <div class="block block-primary-light block-wide">report_html.py · HTML 报告输出<small>单页报告 · 暗色模式 · 可打印</small></div>
+        <div class="block" style="background:rgba(74,222,128,.15);border:1px solid var(--green);color:var(--green);" class="block-wide">screener/ · 内置选股器 ⭐<small>多源数据 · 技术预筛 · 批量分析 · 综合评分</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 网关层 -->
+  <div class="layer-row layer-gateway">
+    <div class="layer-label">网关层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="block block-primary block-wide">TradingAgentsGraph（核心编排器）</div>
+      </div>
+      <div class="block-row" style="margin-top: 8px;">
+        <div class="block block-primary-light">配置校验<small>日期/参数验证</small></div>
+        <div class="block block-primary-light">检查点管理<small>SQLite 保存/恢复</small></div>
+        <div class="block block-primary-light">流式输出<small>subgraphs 实时推送</small></div>
+        <div class="block block-primary-light">状态路由<small>条件边/轮数控制</small></div>
+        <div class="block block-primary-light">身份解析<small>ticker → 公司实体</small></div>
+        <div class="block block-primary-light">记忆注入<small>历史教训加载</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 服务层 -->
+  <div class="layer-row layer-service">
+    <div class="layer-label">服务层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="block block-primary-light">Market Analyst<small>技术面分析</small></div>
+        <div class="block block-primary-light">Sentiment Analyst<small>社交情绪</small></div>
+        <div class="block block-primary-light">News Analyst<small>新闻分析</small></div>
+        <div class="block block-primary-light">Fundamentals Analyst<small>基本面分析</small></div>
+      </div>
+      <div class="block-row">
+        <div class="block block-primary-light">Bull Researcher<small>看多研究</small></div>
+        <div class="block block-primary-light">Bear Researcher<small>看空研究</small></div>
+        <div class="block block-accent-light">Research Manager<small>研究综合</small></div>
+        <div class="block block-primary-light">Trader<small>交易决策</small></div>
+      </div>
+      <div class="block-row">
+        <div class="block block-primary-light">Aggressive Debator<small>激进风控</small></div>
+        <div class="block block-primary-light">Conservative Debator<small>保守风控</small></div>
+        <div class="block block-primary-light">Neutral Debator<small>中立风控</small></div>
+        <div class="block block-accent-light">Portfolio Manager<small>组合审批</small></div>
+      </div>
+      <div class="block-row">
+        <div class="block block-outline">dataflows/router<small>供应商路由</small></div>
+        <div class="block block-outline">llm_clients/factory<small>LLM 工厂</small></div>
+        <div class="block block-outline">memory/log<small>记忆日志</small></div>
+        <div class="block block-outline">memory/settlement<small>结算引擎</small></div>
+        <div class="block block-outline">memory/reflection<small>反思生成</small></div>
+        <div class="block block-outline">backtest<small>回测引擎</small></div>
+        <div class="block block-outline">rating<small>5 级评级</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据层 -->
+  <div class="layer-row layer-data">
+    <div class="layer-label">数据层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="data-store"><span class="icon">🗄️</span>SQLite<small>检查点 · ~/.tradingagents/cache/</small></div>
+        <div class="data-store"><span class="icon">📝</span>Markdown<small>记忆日志 · trading_memory.md</small></div>
+        <div class="data-store"><span class="icon">📁</span>File Cache<small>数据缓存 · OHLCV/财报</small></div>
+        <div class="data-store"><span class="icon">📊</span>JSON/HTML<small>报告输出 · results_dir/</small></div>
+        <div class="data-store"><span class="icon">🔒</span>Auth Cache<small>ChatGPT Token · ~/.tradingagents/</small></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- IAAS层 -->
+  <div class="layer-row layer-infra">
+    <div class="layer-label">基础设施层</div>
+    <div class="layer-content">
+      <div class="block-row">
+        <div class="block block-primary block-wide">本地 Python 环境 / Docker 容器 / 云服务器<small>Python 3.11+ · LangGraph · LangChain · pandas · yfinance</small></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ==================== 业务架构 ==================== -->
+<div id="tab-biz" class="tab-panel">
+
+  <div class="section-header">
+    <h1>2.1 业务架构</h1>
+    <div class="subtitle">TradingAgents v0.7.1 · 多智能体量化交易决策业务全景</div>
+  </div>
+
+  <!-- 系统业务模块 -->
+  <div class="biz-grid">
+    <div class="biz-sidebar">系统业务模块</div>
+    <div class="biz-main">
+
+      <!-- 投资分析 -->
+      <div class="biz-category">
+        <div class="biz-category-title">投资分析</div>
+        <div class="biz-modules">
+          <div class="biz-module red">技术面分析<small style="font-weight:400;font-size:.68rem;opacity:.8">MACD/RSI/Bollinger</small></div>
+          <div class="biz-module red">社交情绪分析<small style="font-weight:400;font-size:.68rem;opacity:.8">Reddit/StockTwits</small></div>
+          <div class="biz-module red">新闻事件分析<small style="font-weight:400;font-size:.68rem;opacity:.8">公司/宏观新闻</small></div>
+          <div class="biz-module red">基本面分析<small style="font-weight:400;font-size:.68rem;opacity:.8">财报/资产负债表</small></div>
+        </div>
+      </div>
+
+      <!-- 研究辩论 -->
+      <div class="biz-category">
+        <div class="biz-category-title">研究辩论</div>
+        <div class="biz-modules">
+          <div class="biz-module red">看多研究<small style="font-weight:400;font-size:.68rem;opacity:.8">Bull Researcher</small></div>
+          <div class="biz-module red">看空研究<small style="font-weight:400;font-size:.68rem;opacity:.8">Bear Researcher</small></div>
+          <div class="biz-module red" style="background:#c62828;">研究综合<small style="font-weight:400;font-size:.68rem;opacity:.8">Research Manager</small></div>
+        </div>
+      </div>
+
+      <!-- 交易决策 -->
+      <div class="biz-category">
+        <div class="biz-category-title">交易决策</div>
+        <div class="biz-modules">
+          <div class="biz-module red">交易提案<small style="font-weight:400;font-size:.68rem;opacity:.8">时机与仓位建议</small></div>
+          <div class="biz-module red">5 级评级<small style="font-weight:400;font-size:.68rem;opacity:.8">Buy/Overweight/Hold/Underweight/Sell</small></div>
+        </div>
+      </div>
+
+      <!-- 风控管理 -->
+      <div class="biz-category">
+        <div class="biz-category-title">风控管理</div>
+        <div class="biz-modules">
+          <div class="biz-module red">激进派风控<small style="font-weight:400;font-size:.68rem;opacity:.8">Aggressive</small></div>
+          <div class="biz-module red">保守派风控<small style="font-weight:400;font-size:.68rem;opacity:.8">Conservative</small></div>
+          <div class="biz-module red">中立派风控<small style="font-weight:400;font-size:.68rem;opacity:.8">Neutral</small></div>
+          <div class="biz-module red" style="background:#c62828;">组合审批<small style="font-weight:400;font-size:.68rem;opacity:.8">Portfolio Manager</small></div>
+        </div>
+      </div>
+
+      <!-- 回测评估 -->
+      <div class="biz-category">
+        <div class="biz-category-title">回测评估</div>
+        <div class="biz-modules">
+          <div class="biz-module red">网格回测<small style="font-weight:400;font-size:.68rem;opacity:.8">ticker × date 遍历</small></div>
+          <div class="biz-module red">Alpha 评分<small style="font-weight:400;font-size:.68rem;opacity:.8">相对基准超额回报</small></div>
+          <div class="biz-module red">命中率统计<small style="font-weight:400;font-size:.68rem;opacity:.8">按评级分组 hit_rate</small></div>
+          <div class="biz-module red">持仓模拟<small style="font-weight:400;font-size:.68rem;opacity:.8">PortfolioContext 注入</small></div>
+        </div>
+      </div>
+
+      <!-- 记忆与反思 -->
+      <div class="biz-category">
+        <div class="biz-category-title">记忆与反思</div>
+        <div class="biz-modules">
+          <div class="biz-module red">决策记录<small style="font-weight:400;font-size:.68rem;opacity:.8">append-only 日志</small></div>
+          <div class="biz-module red">自动结算<small style="font-weight:400;font-size:.68rem;opacity:.8">持有期到期评分</small></div>
+          <div class="biz-module red">经验反思<small style="font-weight:400;font-size:.68rem;opacity:.8">LLM 生成教训</small></div>
+          <div class="biz-module red">跨标的学习<small style="font-weight:400;font-size:.68rem;opacity:.8">跨 ticker 经验共享</small></div>
+        </div>
+      </div>
+
+      <!-- 报告输出 -->
+      <div class="biz-category">
+        <div class="biz-category-title">报告输出</div>
+        <div class="biz-modules">
+          <div class="biz-module red">Markdown 报告<small style="font-weight:400;font-size:.68rem;opacity:.8">分节文本报告</small></div>
+          <div class="biz-module red">HTML 单页报告<small style="font-weight:400;font-size:.68rem;opacity:.8">可打印/暗色模式</small></div>
+          <div class="biz-module red">JSON 状态日志<small style="font-weight:400;font-size:.68rem;opacity:.8">完整运行状态</small></div>
+        </div>
+      </div>
+
+      <!-- 内置选股器 ⭐ -->
+      <div class="biz-category">
+        <div class="biz-category-title" style="background:rgba(74,222,128,.15);color:var(--green);">内置选股器 ⭐</div>
+        <div class="biz-modules">
+          <div class="biz-module" style="background:var(--green);color:var(--white);">全市场扫描<small style="font-weight:400;font-size:.68rem;opacity:.8">BaoStock/AKShare 5000+ 只 A 股</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">四源数据回退<small style="font-weight:400;font-size:.68rem;opacity:.8">BaoStock > 腾讯 > 新浪 > 东财（不访 Yahoo）</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">技术面预筛选<small style="font-weight:400;font-size:.68rem;opacity:.8">RSI/MACD/均线/成交量</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">多智能体分析<small style="font-weight:400;font-size:.68rem;opacity:.8">TradingAgents 引擎</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">综合评分排序<small style="font-weight:400;font-size:.68rem;opacity:.8">LLM 40% + 技术 30% + 资金 20% + 动量 10%</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">Top N 推荐<small style="font-weight:400;font-size:.68rem;opacity:.8">自动生成分析报告 + 交易点位</small></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 系统基础模块 -->
+  <div class="biz-grid biz-foundation">
+    <div class="biz-sidebar">系统基础模块</div>
+    <div class="biz-main">
+
+      <div class="biz-category">
+        <div class="biz-category-title">配置管理</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">默认配置<small style="font-weight:400;font-size:.68rem;opacity:.8">DEFAULT_CONFIG</small></div>
+          <div class="biz-module accent">环境变量<small style="font-weight:400;font-size:.68rem;opacity:.8">TRADINGAGENTS_*</small></div>
+          <div class="biz-module accent">偏好持久化<small style="font-weight:400;font-size:.68rem;opacity:.8">cli/prefs.py</small></div>
+          <div class="biz-module accent">.env 加载<small style="font-weight:400;font-size:.68rem;opacity:.8">dotenv</small></div>
+        </div>
+      </div>
+
+      <div class="biz-category">
+        <div class="biz-category-title">LLM 客户端</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">客户端工厂<small style="font-weight:400;font-size:.68rem;opacity:.8">create_tier_client</small></div>
+          <div class="biz-module accent">双 Tier 模型<small style="font-weight:400;font-size:.68rem;opacity:.8">quick/deep think</small></div>
+          <div class="biz-module accent">模型目录<small style="font-weight:400;font-size:.68rem;opacity:.8">model_catalog</small></div>
+          <div class="biz-module accent">能力检测<small style="font-weight:400;font-size:.68rem;opacity:.8">capabilities</small></div>
+          <div class="biz-module accent">订阅认证<small style="font-weight:400;font-size:.68rem;opacity:.8">ChatGPT OAuth</small></div>
+        </div>
+      </div>
+
+      <div class="biz-category">
+        <div class="biz-category-title">数据供应商路由</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">路由引擎<small style="font-weight:400;font-size:.68rem;opacity:.8">route_to_vendor</small></div>
+          <div class="biz-module accent">Fallback 链<small style="font-weight:400;font-size:.68rem;opacity:.8">多供应商降级</small></div>
+          <div class="biz-module accent">日期窗口<small style="font-weight:400;font-size:.68rem;opacity:.8">look-ahead 防护</small></div>
+          <div class="biz-module accent">错误分类<small style="font-weight:400;font-size:.68rem;opacity:.8">VendorError 体系</small></div>
+        </div>
+      </div>
+
+      <div class="biz-category">
+        <div class="biz-category-title">图编排引擎</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">LangGraph<small style="font-weight:400;font-size:.68rem;opacity:.8">StateGraph 编排</small></div>
+          <div class="biz-module accent">条件路由<small style="font-weight:400;font-size:.68rem;opacity:.8">辩论/风控轮转</small></div>
+          <div class="biz-module accent">并行调度<small style="font-weight:400;font-size:.68rem;opacity:.8">分析师并发</small></div>
+          <div class="biz-module accent">检查点<small style="font-weight:400;font-size:.68rem;opacity:.8">SQLite 恢复</small></div>
+        </div>
+      </div>
+
+      <div class="biz-category">
+        <div class="biz-category-title">CLI 交互</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">Typer 入口<small style="font-weight:400;font-size:.68rem;opacity:.8">命令行框架</small></div>
+          <div class="biz-module accent">Rich 界面<small style="font-weight:400;font-size:.68rem;opacity:.8">终端渲染</small></div>
+          <div class="biz-module accent">Questionary<small style="font-weight:400;font-size:.68rem;opacity:.8">交互式问答</small></div>
+          <div class="biz-module accent">版本更新<small style="font-weight:400;font-size:.68rem;opacity:.8">后台检查</small></div>
+        </div>
+      </div>
+
+      <div class="biz-category">
+        <div class="biz-category-title">部署与构建</div>
+        <div class="biz-modules">
+          <div class="biz-module accent">Docker<small style="font-weight:400;font-size:.68rem;opacity:.8">多阶段构建</small></div>
+          <div class="biz-module accent">setuptools<small style="font-weight:400;font-size:.68rem;opacity:.8">打包发布</small></div>
+          <div class="biz-module accent">GitHub Actions<small style="font-weight:400;font-size:.68rem;opacity:.8">CI/CD</small></div>
+          <div class="biz-module accent">ruff + pytest<small style="font-weight:400;font-size:.68rem;opacity:.8">代码质量</small></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

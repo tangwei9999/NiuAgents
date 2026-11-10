@@ -268,24 +268,33 @@ def get_macro_indicators(
 def get_prediction_markets(
     topic: Annotated[
         str,
-        "Event topic/keyword, e.g. 'Fed rate cut', 'recession 2026', "
-        "'US election', or a sector/company event.",
+        "Event topic/keyword, written in the language of the market being "
+        "analysed: '半导体 设备 国产替代', '银行 红利', '沪深300 政策' for A "
+        "shares, 'Fed rate cut', 'US election' for US events. A China-only "
+        "vendor prices index expiries rather than narrative events, and a "
+        "sector or style word selects that index's option board, so for an "
+        "A-share analysis name the sector the stock sits in.",
     ],
-    limit: Annotated[int | None, "Max markets to return; omit for a default of 6"] = None,
+    limit: Annotated[
+        int | None, "Max rows to return; omit for the vendor's default"
+    ] = None,
     trade_date: Annotated[str, InjectedState("trade_date")] = "",
 ) -> str:
     """
-    Retrieve live, market-implied probabilities for forward-looking events from
-    prediction markets (Polymarket): Fed decisions, recession, elections,
-    geopolitics, crypto. Returns the most-traded open markets matching the
-    topic, each with its implied probability, traded volume, resolution date,
-    and recent move. Uses the configured prediction_markets vendor.
+    Retrieve live, market-implied probabilities for forward-looking events.
+
+    What is priced depends on the configured prediction_markets vendor: from an
+    offshore setup that is Polymarket, returning the most-traded open markets
+    matching the topic with their implied probability, traded volume,
+    resolution date and recent move; from a China-only setup it is the SSE index
+    option chain, returning the expiry forward and the odds of closing above or
+    below a set of strikes. Both are market odds rather than forecasts.
 
     Args:
-        topic (str): Event keyword(s) to search
-        limit (int): Max markets to return; omit for a default of 6
+        topic (str): Event keyword(s) to search, or the market/sector to price
+        limit (int): Max rows to return; omit for the vendor's default
 
     Returns:
-        str: A formatted markdown report of matching prediction markets
+        str: A formatted markdown report of the priced forward-looking events
     """
     return route_to_vendor("get_prediction_markets", topic, limit, trade_date or None)
