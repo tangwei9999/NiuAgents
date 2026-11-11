@@ -304,6 +304,7 @@ def test_akshare_is_put_on_a_budget_of_its_own():
     """AKShare ships (10, 60) and retries three times inside its own helper, so
     one interface meeting a stalled East Money could spend three quarters of a
     minute before the router saw the failure. Importing the vendor caps that."""
+    pytest.importorskip("akshare")  # caps the real library's own default timeout
     from akshare.utils.context import config
 
     from tradingagents.dataflows.vendors import akshare as akshare_vendor
@@ -397,7 +398,7 @@ def test_the_baostock_fallbacks_run_under_a_socket_budget(monkeypatch):
 
     The SDK is not contacted here -- the fake fails where its socket would be
     opened, which is what the guard has to have already covered."""
-    import baostock as bs
+    bs = pytest.importorskip("baostock")
 
     seen = []
 
@@ -422,7 +423,7 @@ def test_the_baostock_fallbacks_run_under_a_socket_budget(monkeypatch):
 @pytest.mark.unit
 def test_a_stalled_baostock_does_not_stop_the_price_levels_chain(monkeypatch):
     """The caller must be handed None and a finished run, not a hung process."""
-    import baostock as bs
+    bs = pytest.importorskip("baostock")
 
     from tradingagents.screener import price_levels
 
