@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradingAgents 内置选股器 — A股智能选股实战指南</title>
+<title>NiuAgents 内置选股器 — A股智能选股实战指南</title>
 <style>
   :root {
     --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
@@ -118,7 +118,7 @@
 <body>
 
 <div class="header">
-  <h1>TradingAgents 内置选股器</h1>
+  <h1>NiuAgents 内置选股器</h1>
   <p>A股智能选股实战指南 — 从全市场 5000+ 只股票中自动推荐 Top 3</p>
   <div class="badge">⭐ 新功能 · 无需提供候选股票池</div>
 </div>
@@ -130,8 +130,8 @@
   <h3>重要声明</h3>
   <ul>
     <li><strong>本项目仅供研究，不构成投资建议。</strong>官方明确声明："It is not intended as financial, investment, or trading advice."</li>
-    <li>系统输出的是 <strong>5 级评级</strong>（Buy/Overweight/Hold/Underweight/Sell）和<strong>综合评分</strong>，不直接给出具体价格点位。</li>
-    <li>卖出点位需要结合技术分析师输出的 <strong>RSI / MACD / 布林带</strong> 等指标自行判断。</li>
+    <li>分析引擎输出 <strong>5 级评级</strong>（Buy/Overweight/Hold/Underweight/Sell）与<strong>综合评分</strong>；交易员在能给出时会附上<strong>入场价 / 止损位 / 仓位建议</strong>。</li>
+    <li>选股器最终推荐另有<strong>阻力位 / 支撑位 / 建议买入价 / 建议卖出价</strong>，那是波段高低点的机械计算结果，仍需结合技术分析师的 <strong>RSI / MACD / 布林带</strong> 自行判断。</li>
     <li>选股器数据来自 <strong>AKShare 多数据源</strong>（东方财富/腾讯/新浪）+ BaoStock，覆盖全 A 股主板和创业板，支持多源回退；<strong>不访问 Yahoo</strong>。</li>
     <li>LLM 输出有随机性，同一只股票跑两次结果可能不同。</li>
   </ul>
@@ -144,7 +144,7 @@
     <li><strong>全市场覆盖</strong>：从 A 股全市场 5000+ 只股票中智能筛选，不再局限于固定股票池</li>
     <li><strong>AKShare 数据源集成</strong>：AKShare（东财）＞ BaoStock ＞ 内置股票池，国内数据源优先，限流时自动回退</li>
     <li><strong>多维度分析</strong>：消息面、技术面、资金面、基本面全方位分析</li>
-    <li><strong>多智能体深度分析</strong>：复用 TradingAgents 的 11 个 LLM 智能体分析引擎</li>
+    <li><strong>多智能体深度分析</strong>：复用 TradingAgents 的 12 个 LLM 智能体分析引擎</li>
     <li><strong>综合评分排序</strong>：LLM 评级 40% + 技术面 30% + 资金面 20% + 动量 10%</li>
     <li><strong>交易点位建议</strong>：最终推荐每只一行输出阻力位、支撑位、建议买入价、建议卖出价</li>
     <li><strong>自动报告生成</strong>：Markdown/HTML 格式的详细分析报告</li>
@@ -234,8 +234,8 @@ DEEPSEEK_API_KEY=sk-你的DeepSeek密钥
 <span class="cm"># OPENAI_API_KEY=sk-你的OpenAI密钥</span>
 
 <span class="cm"># === 模型选择 ===</span>
-TRADINGAGENTS_QUICK_THINK_LLM=deepseek-chat
-TRADINGAGENTS_DEEP_THINK_LLM=deepseek-reasoner
+TRADINGAGENTS_QUICK_THINK_LLM=deepseek-flash
+TRADINGAGENTS_DEEP_THINK_LLM=deepseek-v4-pro
 
 <span class="cm"># === 可选：输出语言改为中文 ===</span>
 TRADINGAGENTS_OUTPUT_LANGUAGE=Chinese
@@ -337,16 +337,17 @@ K 线按东财（前复权）→ 腾讯 → 新浪 → BaoStock 回退，不访 
     </tr>
   </table>
 
-  <h3>潜力评分系统（满分 100 分）</h3>
+  <h3>潜力评分系统（各项累加，满分 115 分）</h3>
   <table class="info-table">
     <tr><th>因素</th><th>评分</th><th>说明</th></tr>
-    <tr><td>RSI 30-50（低位）</td><td>+30 分</td><td>还没大涨，启动初期</td></tr>
-    <tr><td>刚突破 MA20（<5%）</td><td>+25 分</td><td>早期上升趋势确认</td></tr>
-    <tr><td>离 MA60 近（<10%）</td><td>+20 分</td><td>长期趋势向好</td></tr>
-    <tr><td>主力净流入>1000 万</td><td>+15 分</td><td>大资金认可</td></tr>
-    <tr><td>板块消息面利好</td><td>+15 分</td><td>近期有催化剂</td></tr>
+    <tr><td>RSI 30-50（低位）</td><td>+30 分</td><td>还没大涨，启动初期（50-60 得 +20，其余 +10）</td></tr>
+    <tr><td>刚突破 MA20（&lt;5%）</td><td>+25 分</td><td>早期上升趋势确认</td></tr>
+    <tr><td>离 MA60 近（&lt;10%）</td><td>+20 分</td><td>长期趋势向好</td></tr>
+    <tr><td>主力净流入&gt;1000 万</td><td>+15 分</td><td>大资金认可（净流入 &gt; 0 得 +10）</td></tr>
+    <tr><td>板块消息面利好</td><td>+15 分</td><td>近期有催化剂（评分 ≥30 得 +10，&gt;0 得 +5）</td></tr>
     <tr><td>MACD 金叉</td><td>+10 分</td><td>技术面确认</td></tr>
   </table>
+  <p><small>加分项互不排斥，一只股票最多可累到 115 分；列表按该分降序打印，超过 <code>--max-candidates</code> 时从尾部截断。</small></p>
 </div>
 
 <!-- ==================== STEP 4 ==================== -->
@@ -431,29 +432,41 @@ K 线按东财（前复权）→ 腾讯 → 新浪 → BaoStock 回退，不访 
   </div>
 
   <div class="flow">
-    <div class="flow-title">内置选股器完整工作流程（6 步）</div>
+    <div class="flow-title">内置选股器完整工作流程（8 步，与 run_screener() 一一对应）</div>
     <div class="flow-row">
-      <div class="flow-node green">第 1 步：获取股票池<br><small>BaoStock/AKShare 获取 5000+ 只 A 股<br>按市值降序排序</small></div>
+      <div class="flow-node green">第 1 步：获取股票池<br><small>AKShare 全 A 股 ~5200 只<br>回退 BaoStock / 内置股票池</small></div>
     </div>
     <div class="flow-arrow-down">▼</div>
     <div class="flow-row">
-      <div class="flow-node blue">第 2 步：基础过滤<br><small>剔除 ST 股票<br>剔除小盘股（市值 < 10 亿）<br>剔除科创板/北交所</small></div>
+      <div class="flow-node blue">第 2 步：基础过滤<br><small>剔除 ST/*ST<br>剔除科创板 688、北交所 8/4<br>保留主板/中小板/创业板</small></div>
     </div>
     <div class="flow-arrow-down">▼</div>
     <div class="flow-row">
-      <div class="flow-node orange">第 3 步：技术面预筛选<br><small>RSI 40-70 区间<br>股价 > MA20<br>成交量放大（量比 > 1.0）<br>MACD 金叉优先</small></div>
+      <div class="flow-node teal">第 3 步：资金面预筛选<br><small>主力净流入 > 0，取前 100 只<br>盘前自动改用最近交易日<br>结果再过一次基础过滤</small></div>
     </div>
     <div class="flow-arrow-down">▼</div>
     <div class="flow-row">
-      <div class="flow-node purple">第 4 步：多智能体深度分析<br><small>TradingAgents 11 个 LLM 智能体<br>技术面 + 消息面 + 资金面 + 基本面<br>多空辩论 + 风控讨论</small></div>
+      <div class="flow-node purple">第 4 步：消息面筛选<br><small>取资金流入前 20 的板块<br>逐板块看近 7 天新闻<br>利好评分 ≥ 30 才保留</small></div>
     </div>
     <div class="flow-arrow-down">▼</div>
     <div class="flow-row">
-      <div class="flow-node yellow">第 5 步：综合评分排序<br><small>LLM 评级 40% + 技术面 30%<br>+ 资金面 20% + 动量 10%</small></div>
+      <div class="flow-node orange">第 5 步：技术面多因子筛选<br><small>RSI 30-65、股价>MA20<br>MACD 金叉、量比 ≥ 0.8<br>算潜力评分并降序排序</small></div>
     </div>
     <div class="flow-arrow-down">▼</div>
     <div class="flow-row">
-      <div class="flow-node red">第 6 步：生成报告<br><small>Top N 推荐股票<br>Markdown/HTML 详细分析<br>保存到 ~/.tradingagents/logs/screener/</small></div>
+      <div class="flow-node yellow">截断 + 🎯 交互确认<br><small>超过 --max-candidates（默认 50）只留前 N<br>打印潜力股列表后问是否深度分析<br>选否则到此结束；--yes 不问</small></div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node green">第 6 步：批量深度分析<br><small>TradingAgents 12 个 LLM 智能体<br>技术面 + 消息面 + 资金面 + 基本面<br>多空辩论 + 风控讨论，每只 3-5 分钟</small></div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node blue">第 7 步：综合评分排序 + 📌 点位<br><small>LLM 评级 40% + 技术面 30%<br>+ 资金面 20% + 动量 10%<br>Top N 每只一行阻力/支撑/买卖价</small></div>
+    </div>
+    <div class="flow-arrow-down">▼</div>
+    <div class="flow-row">
+      <div class="flow-node red">第 8 步：保存报告<br><small>Top N 每只一份评分摘要<br>另加完整报告树 complete_report.md/html<br>保存到 ~/.tradingagents/logs/screener/&lt;date&gt;/</small></div>
     </div>
   </div>
 </div>
@@ -588,23 +601,42 @@ A 股选股器 - 综合评分排名
   </div>
 
   <h3>8.1 调整筛选条件</h3>
-  <p>编辑 <code>TradingAgents/screener/pre_screener.py</code> 可以修改预筛选条件：</p>
+  <p>第 5 步的技术面多因子筛选实现在 <code>tradingagents/screener/pre_screener_v2.py</code>，
+  阈值是调用点 <code>a_stock_screener.run_screener()</code> 里传的实参，改这里最直接：</p>
   <div class="code-block">
     <div class="code-header"><span class="lang">Python</span> 修改筛选参数</div>
     <div class="code-body">
-<span class="cm"># 在 pre_screen_stocks() 函数中调整参数</span>
-screened = pre_screen_stocks(
-    stocks,
-    min_volume_ratio=<span class="num">1.0</span>,    <span class="cm"># 成交量放大倍数（降低可放宽条件）</span>
-    rsi_min=<span class="num">40</span>,             <span class="cm"># RSI 下限（降低可包含超卖股）</span>
-    rsi_max=<span class="num">70</span>,             <span class="cm"># RSI 上限（提高可包含超买股）</span>
-    require_above_ma20=<span class="kw">True</span>,  <span class="cm"># 是否要求股价在 MA20 上方</span>
+<span class="cm"># a_stock_screener.py 第 5 步的实参</span>
+screened = pre_screen_stocks_multi_factor(
+    news_stocks, tech_data,
+    min_main_force_inflow=<span class="num">0</span>,          <span class="cm"># 主力净流入下限（元）</span>
+    rsi_min=<span class="num">30</span>,                       <span class="cm"># RSI 下限（降低可包含超卖股）</span>
+    rsi_max=<span class="num">65</span>,                       <span class="cm"># RSI 上限（提高可包含超买股）</span>
+    min_volume_ratio=<span class="num">0.8</span>,              <span class="cm"># 量比下限（降低可放宽）</span>
+    require_above_ma20=<span class="kw">True</span>,            <span class="cm"># 是否要求股价在 MA20 上方</span>
+    require_macd_golden_cross=<span class="kw">True</span>,     <span class="cm"># 是否要求 MACD 金叉</span>
+    require_hot_sector=<span class="kw">False</span>,            <span class="cm"># 板块热度已在第 4 步体现，不重复要求</span>
+    find_early_uptrend=<span class="kw">True</span>,             <span class="cm"># 是否为早期上升趋势加分</span>
 )
     </div>
   </div>
+  <div class="annotation">
+    <div class="label">还有一条捷径：只改漏斗深度</div>
+    <p>不改代码的话，CLI 的 <code>--max-candidates</code>（深度分析前截断到几只）与 <code>--workers</code>（并发）就能控制单次耗时；
+    资金面取前 100、消息面取前 20 板块这两个数量写在 <code>run_screener()</code> 的实参里，同样改一行即可。</p>
+  </div>
+  <div class="annotation">
+    <div class="label">⚠ 别去 <code>.env</code> 里改这五个键，当前不生效</div>
+    <p><code>tradingagents/default_config.py</code> 里还留着 <code>screener_max_candidates</code>(50)、<code>screener_concurrency</code>(3)、
+    <code>screener_rsi_min</code>(40)、<code>screener_rsi_max</code>(70)、<code>screener_min_volume_ratio</code>(1.0)，
+    其中前四个在 <code>_ENV_OVERRIDES</code> 里还挂了 <code>TRADINGAGENTS_SCREENER_MAX_CANDIDATES / _CONCURRENCY / _RSI_MIN / _RSI_MAX</code> 的环境变量入口——
+    但全仓没有任何代码读这几个键：深度分析上限与并发来自 CLI 的 <code>--max-candidates</code> / <code>--workers</code>（默认 50 / 3），
+    RSI 30-65 与量比 0.8 则写在 <code>run_screener()</code> 的实参里（见上）。改这些键或环境变量<strong>不会改变任何筛选结果</strong>，
+    属于历史遗留、尚未接线的配置项。</p>
+  </div>
 
   <h3>8.2 调整评分权重</h3>
-  <p>编辑 <code>TradingAgents/screener/scorer.py</code> 可以修改评分权重：</p>
+  <p>编辑 <code>tradingagents/screener/scorer.py</code> 可以修改评分权重：</p>
   <div class="code-block">
     <div class="code-header"><span class="lang">Python</span> 修改评分权重</div>
     <div class="code-body">
@@ -616,11 +648,12 @@ DEFAULT_WEIGHTS = {
     <span class="str">"momentum"</span>: <span class="num">0.10</span>,    <span class="cm"># 动量权重</span>
 }
 
-<span class="cm"># 可以通过环境变量覆盖：</span>
-<span class="cm"># TRADINGAGENTS_SCREENER_WEIGHT_RATING=0.50</span>
-<span class="cm"># TRADINGAGENTS_SCREENER_WEIGHT_TECHNICAL=0.25</span>
-<span class="cm"># TRADINGAGENTS_SCREENER_WEIGHT_VOLUME=0.15</span>
-<span class="cm"># TRADINGAGENTS_SCREENER_WEIGHT_MOMENTUM=0.10</span>
+<span class="cm"># 权重由 scorer.get_weights(config) 取得：先看 config 里的 screener_weight_* 四个键，</span>
+<span class="cm"># 没有则回退到上面的 DEFAULT_WEIGHTS。选股器传的是 DEFAULT_CONFIG，</span>
+<span class="cm"># 所以改 tradingagents/default_config.py 里的 screener_weight_rating /</span>
+<span class="cm">#   screener_weight_technical / screener_weight_volume / screener_weight_momentum</span>
+<span class="cm"># 即可生效（四者之和保持 1.0）。</span>
+<span class="cm"># 注：这四个键没有对应的 TRADINGAGENTS_* 环境变量，写在 .env 里不会被读取。</span>
     </div>
   </div>
 
@@ -633,7 +666,7 @@ DEFAULT_WEIGHTS = {
 </div>
 
 <div class="footer">
-  TradingAgents v0.7.1 · 内置选股器实战指南 · 2026-11-06<br>
+  NiuAgents v0.7.1 · 内置选股器实战指南 · 2026-11-11<br>
   本项目仅供研究，不构成投资建议。投资有风险，入市需谨慎。<br>
   <small style="color:var(--green);">⭐ 内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
 </div>

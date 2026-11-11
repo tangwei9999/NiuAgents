@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradingAgents — 技术架构 & 业务架构</title>
+<title>NiuAgents — 技术架构 & 业务架构</title>
 <style>
   :root {
     --bg: #f5f6fa; --card: #fff; --border: #e0e0e0;
@@ -126,7 +126,7 @@
 
   <div class="section-header">
     <h1>2.2 技术架构</h1>
-    <div class="subtitle">TradingAgents v0.7.1 · Multi-Agents LLM Financial Trading Framework</div>
+    <div class="subtitle">NiuAgents v0.7.1 · Multi-Agents LLM Financial Trading Framework（基于上游 TradingAgents）</div>
   </div>
 
   <!-- 用户层 -->
@@ -164,7 +164,7 @@
       <div class="block-row">
         <div class="block block-primary-light block-wide">cli/main.py · Typer CLI 交互界面<small>Rich 渲染 · Questionary 问答 · 偏好持久化 · screener 子命令</small></div>
         <div class="block block-primary-light block-wide">report_html.py · HTML 报告输出<small>单页报告 · 暗色模式 · 可打印</small></div>
-        <div class="block" style="background:rgba(74,222,128,.15);border:1px solid var(--green);color:var(--green);" class="block-wide">screener/ · 内置选股器 ⭐<small>多源数据 · 技术预筛 · 批量分析 · 综合评分</small></div>
+        <div class="block block-wide" style="background:rgba(74,222,128,.15);border:1px solid var(--green);color:var(--green);">screener/ · 内置选股器 ⭐<small>8 步流程：股票池→基础过滤→资金面→消息面→技术面多因子 · 交互确认 · 批量分析 · 综合评分与点位</small></div>
       </div>
     </div>
   </div>
@@ -252,7 +252,7 @@
 
   <div class="section-header">
     <h1>2.1 业务架构</h1>
-    <div class="subtitle">TradingAgents v0.7.1 · 多智能体量化交易决策业务全景</div>
+    <div class="subtitle">NiuAgents v0.7.1 · 多智能体量化交易决策业务全景</div>
   </div>
 
   <!-- 系统业务模块 -->
@@ -338,8 +338,11 @@
         <div class="biz-category-title" style="background:rgba(74,222,128,.15);color:var(--green);">内置选股器 ⭐</div>
         <div class="biz-modules">
           <div class="biz-module" style="background:var(--green);color:var(--white);">全市场扫描<small style="font-weight:400;font-size:.68rem;opacity:.8">BaoStock/AKShare 5000+ 只 A 股</small></div>
-          <div class="biz-module" style="background:var(--green);color:var(--white);">四源数据回退<small style="font-weight:400;font-size:.68rem;opacity:.8">BaoStock > 腾讯 > 新浪 > 东财（不访 Yahoo）</small></div>
-          <div class="biz-module" style="background:var(--green);color:var(--white);">技术面预筛选<small style="font-weight:400;font-size:.68rem;opacity:.8">RSI/MACD/均线/成交量</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">四源数据回退<small style="font-weight:400;font-size:.68rem;opacity:.8">预筛 K 线（data_source.py）：BaoStock &gt; 腾讯 &gt; 新浪 &gt; 东财（不访 Yahoo）</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">资金面预筛<small style="font-weight:400;font-size:.68rem;opacity:.8">主力净流入>0 取前 100（盘前用最近交易日）</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">消息面筛选<small style="font-weight:400;font-size:.68rem;opacity:.8">资金流入前 20 板块的近一周利好</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">技术面多因子<small style="font-weight:400;font-size:.68rem;opacity:.8">RSI 30-65 / MA20 / MACD 金叉 / 量比≥ 0.8</small></div>
+          <div class="biz-module" style="background:var(--green);color:var(--white);">交互确认<small style="font-weight:400;font-size:.68rem;opacity:.8">潜力股列表→是否深度分析（--yes 不问）</small></div>
           <div class="biz-module" style="background:var(--green);color:var(--white);">多智能体分析<small style="font-weight:400;font-size:.68rem;opacity:.8">TradingAgents 引擎</small></div>
           <div class="biz-module" style="background:var(--green);color:var(--white);">综合评分排序<small style="font-weight:400;font-size:.68rem;opacity:.8">LLM 40% + 技术 30% + 资金 20% + 动量 10%</small></div>
           <div class="biz-module" style="background:var(--green);color:var(--white);">Top N 推荐<small style="font-weight:400;font-size:.68rem;opacity:.8">自动生成分析报告 + 交易点位</small></div>

@@ -233,3 +233,17 @@ def format_level_line(stock: dict) -> str:
         f"阻力位：{_fmt('resistance')}，支撑位：{_fmt('support')}，"
         f"建议买入价：{_fmt('buy_price')}，建议卖出价：{_fmt('sell_price')}"
     )
+
+
+def level_basis(bars: int | None = None) -> tuple[str, str]:
+    """(resistance, support) wording of how the levels were derived, for display.
+
+    The console note and the saved summary print this instead of restating the
+    window and the quantiles, so what a run shows cannot drift from what the
+    constants above compute. Pass the stock's own ``bars`` when you have it.
+    """
+    bars = bars or _SWING_BARS
+    return (
+        f"近 {bars} 个交易日最高价的 {_RESISTANCE_QUANTILE:.0%} 分位",
+        f"近 {bars} 个交易日最低价的 {_SUPPORT_QUANTILE:.0%} 分位",
+    )

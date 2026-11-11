@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradingAgents A股实战指南 — 从安装到选股</title>
+<title>NiuAgents A股实战指南 — 从安装到选股</title>
 <style>
   :root {
     --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
@@ -99,7 +99,7 @@
 <body>
 
 <div class="header">
-  <h1>TradingAgents A股实战指南</h1>
+  <h1>NiuAgents A股实战指南</h1>
   <p>从安装到运行，使用内置选股器自动分析 A 股并选出 3 只推荐买入股票 + 卖出点位</p>
 </div>
 
@@ -110,8 +110,8 @@
   <h3>重要声明</h3>
   <ul>
     <li><strong>本项目仅供研究，不构成投资建议。</strong>官方明确声明："It is not intended as financial, investment, or trading advice."</li>
-    <li>系统输出的是 <strong>5 级评级</strong>（Buy/Overweight/Hold/Underweight/Sell），<strong>不直接给出具体价格点位</strong>。</li>
-    <li>卖出点位需要结合技术分析师输出的 <strong>RSI / MACD / 布林带</strong> 等指标自行判断，本指南会教你怎么读。</li>
+    <li>分析引擎输出 <strong>5 级评级</strong>（Buy/Overweight/Hold/Underweight/Sell）；交易员在能给出时会附上<strong>入场价 / 止损位 / 仓位建议</strong>。</li>
+    <li>选股器的最终推荐另有<strong>阻力位 / 支撑位 / 建议买入价 / 建议卖出价</strong>，那是波段高低点的机械计算结果；卖出时机仍需结合技术分析师输出的 <strong>RSI / MACD / 布林带</strong> 自行判断，本指南会教你怎么读。</li>
     <li>A 股数据来自 <strong>四大境内源</strong>（BaoStock > AKShare 腾讯 > AKShare 新浪 > AKShare 东财），覆盖全 A 股 5000+ 只股票，支持多源回退，不访 Yahoo。</li>
     <li>LLM 输出有随机性，同一只股票跑两次结果可能不同。</li>
   </ul>
@@ -213,11 +213,11 @@ OPENAI_API_KEY=sk-你的OpenAI密钥
 <span class="cm"># DEEPSEEK_API_KEY=你的DeepSeek密钥</span>
 
 <span class="cm"># === 模型选择 ===</span>
-<span class="cm"># quick_think：分析师/研究员/交易员用（10个角色）</span>
-TRADINGAGENTS_QUICK_THINK_LLM=gpt-4o
+<span class="cm"># quick_think：分析师/研究员/交易员/风控三方用（10 个角色）</span>
+TRADINGAGENTS_QUICK_THINK_LLM=gpt-6-luna
 
-<span class="cm"># deep_think：经理层用（3个角色，需要深度推理）</span>
-TRADINGAGENTS_DEEP_THINK_LLM=gpt-4o
+<span class="cm"># deep_think：经理层用（2 个角色：研究经理 + 组合经理，需要深度推理）</span>
+TRADINGAGENTS_DEEP_THINK_LLM=gpt-6-sol
 
 <span class="cm"># === 可选：输出语言改为中文 ===</span>
 TRADINGAGENTS_OUTPUT_LANGUAGE=Chinese
@@ -406,26 +406,25 @@ TRADINGAGENTS_MAX_RISK_ROUNDS=2
 <span class="cm"># 确保虚拟环境已激活</span>
 <span class="fn">.\.venv\Scripts\activate.bat</span>
 
-<span class="cm"># 重要：必须退回上一级目录，否则本地 tradingagents 文件夹会遮蔽 CLI 命令</span>
-<span class="fn">cd</span> ..
-
-<span class="cm"># 启动交互式 CLI</span>
+<span class="cm"># 启动交互式 CLI（tradingagents 是装进虚拟环境的命令，在项目里哪个目录都能跑）</span>
 <span class="fn">tradingagents</span>
     </div>
   </div>
 
-  <p>CLI 会依次问你以下问题，按提示回答：</p>
+  <p>CLI 会按 Step 1 到 Step 7 依次问你以下问题（已在 .env 里配好的那一步会自动跳过）：</p>
 
   <table class="info-table">
     <tr><th>问题</th><th>你应该填什么</th><th>说明</th></tr>
-    <tr><td>Ticker</td><td><code>600519.SS</code></td><td>贵州茅台（上海交易所）</td></tr>
-    <tr><td>Date</td><td>按回车（默认今天）</td><td>分析今天的市场</td></tr>
-    <tr><td>LLM Provider</td><td>选你配置的（如 openai）</td><td>用哪个 AI</td></tr>
-    <tr><td>Analysts</td><td>全选（market, social, news, fundamentals）</td><td>4 个分析师都启用</td></tr>
-    <tr><td>Debate rounds</td><td>2</td><td>多空各说 2 轮，分析更深入</td></tr>
-    <tr><td>Risk rounds</td><td>2</td><td>风控辩论 2 轮</td></tr>
-    <tr><td>Save report?</td><td>Yes</td><td>保存分析报告</td></tr>
-    <tr><td>Open HTML?</td><td>Yes</td><td>在浏览器中查看报告</td></tr>
+    <tr><td>Step 1 Ticker</td><td><code>600519.SS</code></td><td>贵州茅台（上海交易所）</td></tr>
+    <tr><td>Step 2 Analysis Date</td><td>按回车（默认今天）</td><td>分析今天的市场</td></tr>
+    <tr><td>Step 3 Output Language</td><td>Chinese</td><td>设了 <code>TRADINGAGENTS_OUTPUT_LANGUAGE</code> 就不问</td></tr>
+    <tr><td>Step 4 Analysts Team</td><td>全选（Market / Social / News / Fundamentals）</td><td>4 个分析师都启用；空格选中/取消，a 一键全选</td></tr>
+    <tr><td>Step 5 Research Depth</td><td>Medium</td><td>Shallow=1 / Medium=3 / Deep=5，这一档同时给多空辩论与风控讨论定轮数</td></tr>
+    <tr><td>Step 6 LLM Provider</td><td>选你配置的（如 openai）</td><td>设了 <code>TRADINGAGENTS_LLM_PROVIDER</code> 就不问；qwen/minimax/glm 会追问区域</td></tr>
+    <tr><td>Step 7 Thinking Agents</td><td>quick 与 deep 各选一个模型</td><td>设了两个 <code>*_THINK_LLM</code> 就不问；Google/OpenAI/Anthropic 还会多一步 Step 8 问思考强度</td></tr>
+    <tr><td>Save report? / Save path</td><td>Y，路径按回车</td><td>默认落在 <code>~/.tradingagents/logs/reports/&lt;ticker&gt;_&lt;时间戳&gt;/</code></td></tr>
+    <tr><td>Also save it as an HTML page?</td><td>Yes</td><td>多一份 <code>complete_report.html</code>，问完会接着问要不要开浏览器</td></tr>
+    <tr><td>Display full report on screen?</td><td>Yes</td><td>在终端里完整打印报告</td></tr>
   </table>
 
   <div class="tip">
@@ -726,7 +725,6 @@ MACD 刚刚形成金叉，短期动能向上。
   <table class="info-table">
     <tr><th>操作</th><th>命令</th></tr>
     <tr><td>激活环境</td><td><code>.\.venv\Scripts\activate.bat</code></td></tr>
-    <tr><td><strong>退回上级目录</strong></td><td><code>cd ..</code>（必须！否则 CLI 命令无法识别）</td></tr>
     <tr><td><strong>内置选股器（推荐）</strong></td><td><code>tradingagents screener --top 3</code></td></tr>
     <tr><td>交互式分析一只股票</td><td><code>tradingagents --ticker 600519.SS --date 2026-11-06 --save</code></td></tr>
     <tr><td>批量分析（脚本）</td><td><code>python analyze_astocks.py</code></td></tr>
@@ -741,7 +739,7 @@ MACD 刚刚形成金叉，短期动能向上。
 </div>
 
 <div class="footer">
-  TradingAgents v0.7.1 · A股实战指南 · 2026-11-06<br>
+  NiuAgents v0.7.1 · A股实战指南 · 2026-11-11<br>
   本项目仅供研究，不构成投资建议。投资有风险，入市需谨慎。<br>
   <small style="color:var(--teal);">内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
 </div>

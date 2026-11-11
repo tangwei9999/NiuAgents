@@ -20,7 +20,11 @@ from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.screener.batch_analyzer import batch_analyze
 from tradingagents.screener.pre_screener import get_technical_indicators_batch
 from tradingagents.screener.pre_screener_v2 import pre_screen_stocks_multi_factor
-from tradingagents.screener.price_levels import attach_price_levels, format_level_line
+from tradingagents.screener.price_levels import (
+    attach_price_levels,
+    format_level_line,
+    level_basis,
+)
 from tradingagents.screener.scorer import print_ranking, rank_stocks
 from tradingagents.screener.stock_universe import filter_st_stocks, get_csi300_stocks
 
@@ -268,10 +272,11 @@ def run_screener(
     console.print("\n[bold green]═══════════════ 📌 交易点位建议 ═══════════════[/bold green]")
     for i, stock in enumerate(top_stocks, 1):
         console.print(f"  [cyan]{i:2d}. {format_level_line(stock)}[/cyan]")
+    res_basis, sup_basis = level_basis()
     console.print(
-        "[dim]口径：阻力位/支撑位 = 近 20 个交易日最高/最低价；"
-        "建议买入价 = 支撑位上方 2%（现价贴近支撑时取现价下方 3%）；"
-        "建议卖出价 = 阻力位下方 2%（现价突破阻力时取现价上方 3%）[/dim]\n"
+        f"[dim]口径：阻力位 = {res_basis}（避开单根长上影）；支撑位 = {sup_basis}（避开单根长下影）；"
+        "建议买入价 = 支撑位上方 2% 且不低于现价 8%（回调不足 2% 时取现价下方 3%）；"
+        "建议卖出价 = 阻力位下方 2% 且不高于现价 12%（获利不足 3% 时取现价上方 3%）[/dim]\n"
     )
 
     # 第 8 步：保存报告
@@ -291,10 +296,11 @@ def run_screener(
                 f.write(f"**评级**: {stock['rating']}\n\n")
                 levels = stock.get("price_levels") or {}
                 if levels:
+                    res_desc, sup_desc = level_basis(levels.get("bars"))
                     f.write("## 交易点位\n\n")
                     f.write(f"- 现价：{levels.get('current_price', 0):.2f}\n")
-                    f.write(f"- 阻力位：{levels.get('resistance', 0):.2f}（近 {levels.get('bars', 0)} 个交易日最高价）\n")
-                    f.write(f"- 支撑位：{levels.get('support', 0):.2f}（近 {levels.get('bars', 0)} 个交易日最低价）\n")
+                    f.write(f"- 阻力位：{levels.get('resistance', 0):.2f}（{res_desc}）\n")
+                    f.write(f"- 支撑位：{levels.get('support', 0):.2f}（{sup_desc}）\n")
                     f.write(f"- 建议买入价：{levels.get('buy_price', 0):.2f}\n")
                     f.write(f"- 建议卖出价：{levels.get('sell_price', 0):.2f}\n\n")
                 f.write("## 细分得分\n\n")

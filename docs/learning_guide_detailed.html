@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TradingAgents 傻瓜式学习指南</title>
+<title>NiuAgents 傻瓜式学习指南</title>
 <style>
   :root {
     --bg: #0f172a; --surface: #1e293b; --surface2: #273549; --border: #334155;
@@ -112,7 +112,7 @@
 <body>
 
 <div class="header">
-  <h1>TradingAgents 傻瓜式学习指南</h1>
+  <h1>NiuAgents 傻瓜式学习指南</h1>
   <p>从零开始，逐行代码解释，配流程图，小白也能看懂</p>
 </div>
 
@@ -274,17 +274,22 @@
 <span class="line"><span class="ln">9</span>        <span class="str">"holding_period_days"</span>: <span class="num">5</span>,         <span class="cm"># 持有几天后结算</span></span>
 <span class="line"><span class="ln">10</span>       <span class="str">"data_vendors"</span>: {</span>
 <span class="line"><span class="ln">11</span>           <span class="str">"core_stock_apis"</span>: <span class="str">"akshare,yfinance"</span>,   <span class="cm"># 行情（AKShare 优先，A 股友好）</span></span>
-<span class="line"><span class="ln">12</span>           <span class="str">"fundamental_data"</span>: <span class="str">"sec_edgar,akshare,yfinance"</span>, <span class="cm"># 财报（SEC 按 filed date）</span></span>
-<span class="line"><span class="ln">13</span>           <span class="str">"news_data"</span>: <span class="str">"akshare,yfinance"</span>,      <span class="cm"># 新闻数据源</span></span>
-<span class="line"><span class="ln">14</span>           <span class="str">"macro_data"</span>: <span class="str">"fred"</span>,                <span class="cm"># 宏观经济</span></span>
-<span class="line"><span class="ln">15</span>       },</span>
-<span class="line"><span class="ln">16</span>    })</span>
+<span class="line"><span class="ln">12</span>           <span class="str">"technical_indicators"</span>: <span class="str">"akshare,yfinance"</span>, <span class="cm"># 技术指标</span></span>
+<span class="line"><span class="ln">13</span>           <span class="str">"fundamental_data"</span>: <span class="str">"sec_edgar,akshare,yfinance"</span>, <span class="cm"># 财报（SEC 按 filed date）</span></span>
+<span class="line"><span class="ln">14</span>           <span class="str">"news_data"</span>: <span class="str">"akshare,yfinance"</span>,      <span class="cm"># 新闻数据源</span></span>
+<span class="line"><span class="ln">15</span>           <span class="str">"macro_data"</span>: <span class="str">"fred"</span>,                <span class="cm"># 宏观经济</span></span>
+<span class="line"><span class="ln">16</span>           <span class="str">"prediction_markets"</span>: <span class="str">"polymarket"</span>,     <span class="cm"># 事件定价；可换 sse_option / none</span></span>
+<span class="line"><span class="ln">17</span>       },</span>
+<span class="line"><span class="ln">18</span>       <span class="cm"># 工具级配置优先于类别级：全局新闻钉在 Yahoo，</span></span>
+<span class="line"><span class="ln">19</span>       <span class="cm"># 免得美股分析读到上证快讯（A 股批量分析会把它改回 akshare）</span></span>
+<span class="line"><span class="ln">20</span>       <span class="str">"tool_vendors"</span>: {<span class="str">"get_global_news"</span>: <span class="str">"yfinance"</span>},</span>
+<span class="line"><span class="ln">21</span>    })</span>
         </div>
       </div>
 
       <div class="annotation">
         <div class="label">重点解释</div>
-        <p><strong>双 Tier 模型</strong>：<code>quick_think_llm</code> 服务分析师/研究员/交易员（10 个角色），<code>deep_think_llm</code> 服务经理层（3 个角色）。两个 tier 可以用不同的 AI 公司！比如 quick 用 OpenAI，deep 用 Anthropic。</p>
+        <p><strong>双 Tier 模型</strong>：<code>quick_think_llm</code> 服务 4 个分析师 + 多空研究员 + 交易员 + 风控三方（共 10 个角色），<code>deep_think_llm</code> 服务经理层（2 个角色：研究经理 + 组合经理）。两个 tier 可以用不同的 AI 公司！比如 quick 用 OpenAI，deep 用 Anthropic。</p>
         <p><strong>data_vendors</strong>：每个数据类别可以配置一个或多个供应商，用逗号分隔就是 fallback 链。比如 <code>"sec_edgar,akshare,yfinance"</code> 表示先试 SEC EDGAR，失败再试 AKShare，最后 Yahoo Finance。预测市场类别可配 <code>polymarket / sse_option / none</code>，A 股批量分析用 sse_option。</p>
         <p><strong>关掉一个可选类别</strong>：<code>macro_data</code> / <code>prediction_markets</code> 这类海外补充源可以直接配 <code>"none"</code>（也认 off / disabled / skip），router 会立即返回 <code>DATA_UNAVAILABLE</code> 哨兵，一个请求也不发 —— 国内网络下这两个源连不上，留着只会每只股票、每个话题付一次连接超时。核心类别（行情/财报/新闻）配 none 会报错，因为决策依赖它们。</p>
         <p><strong>超时与主机跳过</strong>：海外端点用分段超时（连接 3s / 读取 10-20s）；某个主机连接失败后，本次运行会在 <code>TRADINGAGENTS_HOST_BLOCK_COOLDOWN</code>（默认 600 秒）内跳过它，不再重复等待。只有「连不上」才跳过，HTTP 4xx/5xx 与读取慢不算。</p>
@@ -302,7 +307,7 @@
       <div class="flow">
         <div class="flow-title">route_to_vendor() 路由流程图</div>
         <div class="flow-row">
-          <div class="flow-node blue">分析师调用工具<br><small>如 get_stock_data("NVDA")</small></div>
+          <div class="flow-node blue">分析师调用工具<br><small>如 get_stock_data("600519.SS")</small></div>
         </div>
         <div class="flow-arrow-down">▼ 第 1 步：找类别</div>
         <div class="flow-row">
@@ -310,15 +315,15 @@
         </div>
         <div class="flow-arrow-down">▼ 第 2 步：查配置</div>
         <div class="flow-row">
-          <div class="flow-node green">get_vendor()<br><small>查 data_vendors["core_stock_apis"] = "yfinance"</small></div>
+          <div class="flow-node green">get_vendor()<br><small>先看 tool_vendors，再查 data_vendors["core_stock_apis"] = "akshare,yfinance"</small></div>
         </div>
         <div class="flow-arrow-down">▼ 第 3 步：构建供应商链</div>
         <div class="flow-row">
-          <div class="flow-node orange">vendor_chain = ["yfinance"]<br><small>如果是 "sec_edgar,yfinance" → ["sec_edgar", "yfinance"]</small></div>
+          <div class="flow-node orange">vendor_chain = ["akshare", "yfinance"]<br><small>配置里逗号分隔的顺序就是链；没写进去的供应商不会被偷偷使用</small></div>
         </div>
         <div class="flow-arrow-down">▼ 第 4 步：逐个尝试</div>
         <div class="flow-row">
-          <div class="flow-node purple">尝试 yfinance.get_YFin_data_online()</div>
+          <div class="flow-node purple">尝试 akshare.get_akshare_stock_data()</div>
           <div class="flow-arrow">→</div>
           <div class="flow-node green" style="border-style:dashed;">成功？返回结果</div>
         </div>
@@ -343,10 +348,10 @@
 <span class="line"><span class="ln">5</span></span>
 <span class="line"><span class="ln">6</span>    <span class="cm"># 第 2 步：这个类别配置了哪些供应商？</span></span>
 <span class="line"><span class="ln">7</span>    vendor_config = get_vendor(category, method)</span>
-<span class="line"><span class="ln">8</span>    <span class="cm"># 例如："yfinance" 或 "sec_edgar,yfinance"</span></span>
+<span class="line"><span class="ln">8</span>    <span class="cm"># 例如："akshare,yfinance"（默认），或工具级的 tool_vendors 条目</span></span>
 <span class="line"><span class="ln">9</span></span>
 <span class="line"><span class="ln">10</span>    <span class="cm"># 第 3 步：拆成列表</span></span>
-<span class="line"><span class="ln">11</span>    vendor_chain = [<span class="str">"yfinance"</span>]  <span class="cm"># 或 ["sec_edgar", "yfinance"]</span></span>
+<span class="line"><span class="ln">11</span>    vendor_chain = [<span class="str">"akshare"</span>, <span class="str">"yfinance"</span>]  <span class="cm"># 拆分逗号，只保留真可用的名字</span></span>
 <span class="line"><span class="ln">12</span></span>
 <span class="line"><span class="ln">13</span>    <span class="cm"># 第 4 步：逐个尝试</span></span>
 <span class="line"><span class="ln">14</span>    <span class="kw">for</span> vendor <span class="kw">in</span> vendor_chain:</span>
@@ -374,7 +379,7 @@
 
       <div class="tip">
         <div class="tip-label">为什么需要 fallback 链？</div>
-        <p>想象一下：Yahoo Finance 突然限流了（返回 429 错误），如果没有 fallback，整个分析就失败了。有了 fallback 链 <code>"yfinance,alpha_vantage"</code>，系统会自动切换到 Alpha Vantage 获取数据，用户完全无感知。</p>
+        <p>想象一下：AKShare 东方财富突然限流了（返回 429 错误），如果没有 fallback，整个分析就失败了。有了默认链 <code>"akshare,yfinance"</code>，系统会自动切到 Yahoo Finance 取数据，用户完全无感知。反过来说，分析一只美股（如 NVDA）时 AKShare 会先回答“没这个股票的数据”，链上下一个 yfinance 接着试 —— 这就是默认链把 akshare 放前面、美股分析仍然跑得通的原因。想只用一个源，把它单写即可（配 none / off / disabled / skip 则关闭该类别）。</p>
       </div>
     </div>
 
@@ -489,19 +494,22 @@
         <h4>所有工具函数清单</h4>
         <table class="info-table">
           <tr><th>工具函数</th><th>谁用</th><th>获取什么数据</th><th>数据源</th></tr>
-          <tr><td><code>get_stock_data</code></td><td>Market Analyst</td><td>OHLCV 股价</td><td>yfinance / alpha_vantage</td></tr>
-          <tr><td><code>get_indicators</code></td><td>Market Analyst</td><td>RSI/MACD 等技术指标</td><td>yfinance / alpha_vantage</td></tr>
-          <tr><td><code>get_verified_market_snapshot</code></td><td>Market Analyst</td><td>验证后的市场快照</td><td>yfinance</td></tr>
-          <tr><td><code>get_fundamentals</code></td><td>Fundamentals Analyst</td><td>综合基本面数据</td><td>sec_edgar / yfinance</td></tr>
-          <tr><td><code>get_balance_sheet</code></td><td>Fundamentals Analyst</td><td>资产负债表</td><td>sec_edgar / yfinance</td></tr>
-          <tr><td><code>get_income_statement</code></td><td>Fundamentals Analyst</td><td>利润表</td><td>sec_edgar / yfinance</td></tr>
-          <tr><td><code>get_cashflow</code></td><td>Fundamentals Analyst</td><td>现金流量表</td><td>sec_edgar / yfinance</td></tr>
-          <tr><td><code>get_news</code></td><td>News Analyst</td><td>公司新闻</td><td>yfinance / alpha_vantage</td></tr>
-          <tr><td><code>get_global_news</code></td><td>News Analyst</td><td>全球宏观新闻</td><td>yfinance / alpha_vantage</td></tr>
-          <tr><td><code>get_insider_transactions</code></td><td>News Analyst</td><td>内部人交易</td><td>yfinance / alpha_vantage</td></tr>
-          <tr><td><code>get_macro_indicators</code></td><td>News Analyst</td><td>CPI/利率等宏观指标</td><td>FRED</td></tr>
-          <tr><td><code>get_prediction_markets</code></td><td>News Analyst</td><td>预测市场概率</td><td>Polymarket</td></tr>
+          <tr><td><code>get_stock_data</code></td><td>Market Analyst</td><td>OHLCV 股价</td><td>默认链 akshare → yfinance（alpha_vantage 可配）</td></tr>
+          <tr><td><code>get_indicators</code></td><td>Market Analyst</td><td>RSI/MACD 等技术指标</td><td>默认链 akshare → yfinance</td></tr>
+          <tr><td><code>get_verified_market_snapshot</code></td><td>Market Analyst</td><td>验证后的市场快照</td><td>A 股走 get_stock_data 的链；其余用 yfinance</td></tr>
+          <tr><td><code>get_fundamentals</code></td><td>Fundamentals Analyst</td><td>综合基本面数据</td><td>默认链 akshare → yfinance（该工具无 sec_edgar 实现）</td></tr>
+          <tr><td><code>get_balance_sheet</code></td><td>Fundamentals Analyst</td><td>资产负债表</td><td>默认链 sec_edgar → akshare → yfinance</td></tr>
+          <tr><td><code>get_income_statement</code></td><td>Fundamentals Analyst</td><td>利润表</td><td>默认链 sec_edgar → akshare → yfinance</td></tr>
+          <tr><td><code>get_cashflow</code></td><td>Fundamentals Analyst</td><td>现金流量表</td><td>默认链 sec_edgar → akshare → yfinance</td></tr>
+          <tr><td><code>get_news</code></td><td>News Analyst</td><td>公司新闻</td><td>默认链 akshare → yfinance</td></tr>
+          <tr><td><code>get_global_news</code></td><td>News Analyst</td><td>全球宏观新闻</td><td>被 tool_vendors 钉在 yfinance（A 股批量运行时改回 akshare）</td></tr>
+          <tr><td><code>get_insider_transactions</code></td><td>News Analyst</td><td>内部人交易</td><td>默认链 akshare → yfinance（A 股无覆盖，会明说）</td></tr>
+          <tr><td><code>get_macro_indicators</code></td><td>News Analyst</td><td>CPI/利率等宏观指标</td><td>FRED（唯一源；A 股批量分析配 none 直接跳过）</td></tr>
+          <tr><td><code>get_prediction_markets</code></td><td>News Analyst</td><td>预测市场概率</td><td>Polymarket；A 股换 sse_option（上交所 ETF 期权）</td></tr>
         </table>
+        <p><small>“默认链”指 <code>default_config.py</code> 的 <code>data_vendors</code>；<strong>A 股选股器的深度分析阶段会另套一套</strong>：
+        行情/指标/财报/新闻全部只钉 <code>akshare</code>（不回退 Yahoo），<code>macro_data</code> 置 <code>none</code>，
+        <code>prediction_markets</code> 换 <code>sse_option</code>，见 <code>screener/batch_analyzer.py</code>。</small></p>
       </div>
     </div>
 
@@ -549,7 +557,7 @@
       <div class="concept">
         <h4>LangGraph 是什么？</h4>
         <p>LangGraph 是一个 Python 库，让你用代码定义"流程图"。每个方框是一个<strong>节点</strong>（Node），每条箭头是一条<strong>边</strong>（Edge）。程序按照流程图的顺序执行。</p>
-        <p>TradingAgents 用 LangGraph 来编排 11 个 AI 智能体的协作顺序。</p>
+        <p>TradingAgents 用 LangGraph 来编排 12 个 AI 智能体的协作顺序。</p>
       </div>
 
       <div class="flow">
@@ -1035,7 +1043,7 @@
           <li><strong>逐级筛选漏斗</strong>：基础过滤 → 资金面前 100 → 消息面利好板块 → 技术面几十只</li>
           <li><strong>消息面优先</strong>：消息面筛选在技术指标计算之前，节省大量 API 调用时间</li>
           <li><strong>交互确认</strong>：筛选完成后打印潜力股列表，由你决定是否深度分析（<code>--yes</code> 跳过提问，无人值守用）</li>
-          <li><strong>多智能体深度分析</strong>：复用 TradingAgents 的 11 个 LLM 智能体分析引擎</li>
+          <li><strong>多智能体深度分析</strong>：复用 TradingAgents 的 12 个 LLM 智能体分析引擎</li>
           <li><strong>综合评分排序</strong>：LLM 评级 40% + 技术面 30% + 资金面 20% + 动量 10%</li>
           <li><strong>最终推荐输出</strong>：以表格清晰列出 Top 3 股票代码、名称、上涨潜力分数、综合评级</li>
           <li><strong>交易点位建议</strong>：每只股票一行给出阻力位、支撑位、建议买入价、建议卖出价（近 20 个交易日高低点分位）</li>
@@ -1151,7 +1159,7 @@
 </div>
 
 <div class="footer">
-  TradingAgents v0.7.1 · 傻瓜式学习指南 · 2026-11-06<br>
+  NiuAgents v0.7.1 · 傻瓜式学习指南 · 2026-11-11<br>
   建议配合 architecture_diagram.html 和 architecture_full.html 一起阅读<br>
   <small style="color:var(--green);">⭐ 内置选股器全链路境内数据源（技术指标：BaoStock > AKShare 腾讯/新浪/东财），覆盖全 A 股 5000+ 只股票，不访 Yahoo</small>
 </div>
