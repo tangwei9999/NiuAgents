@@ -55,7 +55,8 @@ NiuAgents 在上游 TradingAgents 的多智能体分析引擎之上，做了一�
 **2. cd 到项目根目录，创建虚拟环境**
 
 ```powershell
-cd D:\java_projects\NiuAgents
+# 进入你 clone 下来的项目根目录（默认名 NiuAgents，路径按实际替换）
+cd <项目根目录>
 python -m venv .venv
 ```
 

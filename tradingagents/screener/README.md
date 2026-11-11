@@ -40,8 +40,8 @@
 ### 1. 激活虚拟环境
 
 ```powershell
-# 进入项目根目录（clone 后的目录，默认名 NiuAgents）
-cd D:\java_projects\NiuAgents
+# 进入项目根目录（你 clone 下来的 NiuAgents 目录，路径按实际替换）
+cd <项目根目录>
 .\.venv\Scripts\activate.bat
 ```
 
