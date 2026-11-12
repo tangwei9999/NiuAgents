@@ -41,6 +41,16 @@ dev = [
 bedrock = [
     "langchain-aws>=1.7.9",
 ]
+# A-share screener data sources (tradingagents/screener). Optional so the core
+# install stays lean: pip install "tradingagents[a-share]" (or ".[a-share]" from
+# the repo). akshare/baostock drive the stock-list / K-line / capital-flow
+# fallbacks; tushare is the optional second capital-flow source and only
+# activates when the TUSHARE_TOKEN environment variable is set.
+a-share = [
+    "akshare>=1.20",
+    "baostock>=0.9",
+    "tushare>=1.2",
+]
 
 [project.scripts]
 tradingagents = "cli.main:app"

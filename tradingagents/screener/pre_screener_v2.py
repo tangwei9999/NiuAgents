@@ -1,8 +1,9 @@
 """多因子预筛选器 - 技术面 + 资金面 + 板块热度三维筛选。"""
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -13,6 +14,8 @@ logger = logging.getLogger(__name__)
 _PRE_OPEN_RANK_INDICATOR = "5日"  # 全市场活跃候选池来源（近 5 日，含最近交易日）
 _PRE_OPEN_CANDIDATE_MULT = 2      # 候选池 = max_stocks × 该倍数
 _PRE_OPEN_WORKERS = 16            # 逐只精查的并发度（实测 30 只 7.4s、0 失败）
+_PRE_OPEN_UNIVERSE_PROBE_MAX = 300  # 排行不可用、退到整池时，最多精查前 N 只（按流动性）
+_PROBE_CIRCUIT_BATCH = 32           # 逐只精查的分批大小；首批全失败即判定限流熔断停止
 
 _last_window_note = ""
 
@@ -115,14 +118,128 @@ _prev_day_flow_cache: dict[str, tuple | None] = {}
 
 
 def _ensure_prev_day_flow(codes: list[str]) -> dict[str, tuple]:
-    """并发补齐 codes 的最近交易日主力净流入，返回查得有效值的 {code: (日期, 值)}。"""
+    """并发补齐 codes 的最近交易日主力净流入，返回查得有效值的 {code: (日期, 值)}。
+
+    分批探活 + 熔断：东财个股历史接口若与排行同被限流，首批会全部失败——此时立即
+    停止，不再逐只 hammer 剩余代码（否则整池 4000+ 次超时空转，还会延长限流）。
+    """
     missing = [c for c in codes if c not in _prev_day_flow_cache]
-    if missing:
-        logger.info(f"精查 {len(missing)} 只股票的最近交易日主力净流入…")
-        with ThreadPoolExecutor(max_workers=_PRE_OPEN_WORKERS) as ex:
-            for code, hit in zip(missing, ex.map(_latest_session_inflow, missing), strict=False):
+    if not missing:
+        return {c: _prev_day_flow_cache[c] for c in codes if _prev_day_flow_cache.get(c)}
+
+    logger.info(f"精查 {len(missing)} 只股票的最近交易日主力净流入…")
+    with ThreadPoolExecutor(max_workers=_PRE_OPEN_WORKERS) as ex:
+        for start in range(0, len(missing), _PROBE_CIRCUIT_BATCH):
+            chunk = missing[start:start + _PROBE_CIRCUIT_BATCH]
+            results = list(ex.map(_latest_session_inflow, chunk))
+            for code, hit in zip(chunk, results, strict=False):
                 _prev_day_flow_cache[code] = hit
+            # 首批全部拿不到 → 判定个股历史接口亦被限流，熔断停止（不缓存为 None 以外的代码下次仍会重试）。
+            if start == 0 and not any(results):
+                logger.warning(
+                    "首批 %d 只个股历史资金流全部获取失败，判定东方财富个股接口亦被限流，"
+                    "停止逐只精查（避免空转与延长限流）；建议配置 TUSHARE_TOKEN 或稍后重跑。",
+                    len(chunk),
+                )
+                break
     return {c: _prev_day_flow_cache[c] for c in codes if _prev_day_flow_cache.get(c)}
+
+
+# ============================================================
+# Tushare Pro：资金流的第二数据源（需 token，未配置时该源自动跳过）
+# ============================================================
+# 东财 push2（全市场排行）与 push2his（个股历史）被全域限流时，资金面筛选会
+# 拿不到任何净流入。Tushare 是完全独立的服务端，moneyflow(trade_date) 一次返回
+# 全市场个股当日资金流（单位万元），盘前正好对应最近一个已完成交易日，可在东财
+# 两条路都失败时补上。仅当环境变量 TUSHARE_TOKEN 非空且装了 tushare 时启用；
+# 未配置时所有函数返回空，行为与接入前完全一致（不阻塞、不抛出）。
+
+def _tushare_ready() -> bool:
+    """是否具备用 Tushare 补资金流的条件（装了库且配了 token）。"""
+    if not os.getenv("TUSHARE_TOKEN", "").strip():
+        return False
+    try:
+        import tushare  # noqa: F401  # 可用性探测
+    except ImportError:
+        return False
+    return True
+
+
+def _tushare_pro():
+    import tushare as ts
+
+    return ts.pro_api(os.getenv("TUSHARE_TOKEN", "").strip())
+
+
+def _tushare_latest_trade_date() -> str | None:
+    """最近一个已完成交易日（YYYYMMDD）：从今天往前在 SSE 交易日历里找。"""
+    try:
+        pro = _tushare_pro()
+    except Exception as e:
+        logger.warning(f"Tushare 初始化失败：{e}")
+        return None
+    end = datetime.now().strftime("%Y%m%d")
+    start = (datetime.now() - timedelta(days=20)).strftime("%Y%m%d")
+    try:
+        cal = pro.trade_cal(exchange="SSE", start_date=start, end_date=end, is_open="1")
+    except Exception as e:
+        logger.warning(f"Tushare 交易日历获取失败：{e}")
+        return None
+    if cal is None or cal.empty:
+        return None
+    past = [str(d) for d in cal["cal_date"].tolist() if str(d) < end]
+    return max(past) if past else None
+
+
+def _tushare_session_flow(codes: list[str]) -> dict[str, tuple]:
+    """用 Tushare moneyflow 补齐最近交易日主力净流入（元），返回 {code: (日期, 值)}。
+
+    东财两条路都失败时调用；未配置 token / 库缺失 / 接口异常一律返回空 dict，
+    交由上层按“资金面筛选跳过”处理，绝不抛出、不阻断。
+    """
+    if not _tushare_ready():
+        return {}
+    trade_date = _tushare_latest_trade_date()
+    if not trade_date:
+        return {}
+    try:
+        pro = _tushare_pro()
+        df = pro.moneyflow(trade_date=trade_date)
+    except Exception as e:
+        logger.warning(f"Tushare 资金流获取失败：{e}")
+        return {}
+    if df is None or df.empty:
+        return {}
+
+    required = [
+        "ts_code", "buy_elg_amount", "sell_elg_amount",
+        "buy_lg_amount", "sell_lg_amount",
+    ]
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        logger.warning(f"Tushare moneyflow 缺少列 {missing}，跳过")
+        return {}
+
+    # 主力净额（万元）= 超大单净买 + 大单净买；东财口径为元，统一 ×1e4
+    net = (
+        (pd.to_numeric(df["buy_elg_amount"], errors="coerce")
+         - pd.to_numeric(df["sell_elg_amount"], errors="coerce"))
+        + (pd.to_numeric(df["buy_lg_amount"], errors="coerce")
+           - pd.to_numeric(df["sell_lg_amount"], errors="coerce"))
+    ).fillna(0) * 1e4
+    codes_series = df["ts_code"].astype(str).str.split(".").str[0].str.zfill(6)
+
+    code_set = set(codes)
+    day = f"{trade_date[:4]}-{trade_date[4:6]}-{trade_date[6:]}"
+    flows: dict[str, tuple] = {}
+    for code, value in zip(codes_series, net, strict=False):
+        if code in code_set and not pd.isna(value):
+            flows[code] = (day, float(value))
+    if flows:
+        logger.info(
+            f"东财资金流不可用，改用 Tushare 补齐 {len(flows)} 只股票的 {day} 主力净流入"
+        )
+    return flows
 
 
 def get_hot_sectors(top_n: int = 10) -> set[str]:
@@ -310,6 +427,34 @@ def filter_by_news_sector(stocks: list[dict[str, str]], positive_sectors: dict[s
     return filtered
 
 
+def apply_news_screen(
+    fund_flow_stocks: list[dict], positive_sectors: dict[str, float]
+) -> tuple[list[dict], bool]:
+    """消息面软筛选：拿不到就透传，不再中断。
+
+    消息面是“软条件”而非硬门槛——东财板块资金流排行 / 成分股 / 个股新闻任意一处被限流
+    而取不到数据（或本周确实无利好板块、无股票落入利好板块）时，把资金面候选原样透传，
+    交由调用方据此关闭第 5 步的逐只行业/新闻回查（lookup_news）。
+
+    Args:
+        fund_flow_stocks: 第 3 步资金面选出的股票
+        positive_sectors: get_positive_news_sectors 的结果（限流/无利好时为空 dict）
+
+    Returns:
+        (传给第 5 步的股票列表, 是否降级)。degraded=True 表示消息面未能筛出可用子集。
+    """
+    if not positive_sectors:
+        logger.warning("利好板块为空（数据缺失或本周无利好），消息面降级：透传资金面候选")
+        return fund_flow_stocks, True
+
+    news_stocks = filter_by_news_sector(fund_flow_stocks, positive_sectors)
+    if not news_stocks:
+        logger.warning("无股票落入利好板块（成分股数据缺失或未命中），消息面降级：透传资金面候选")
+        return fund_flow_stocks, True
+
+    return news_stocks, False
+
+
 def get_fund_flow_rank() -> pd.DataFrame | None:
     """
     获取全市场个股资金流向排名。
@@ -410,15 +555,22 @@ def get_stock_list_by_previous_day_flow(
     2) 并发精查候选池每只股票的最近交易日主力净流入（走个股历史接口，与全市场
        排行是不同端点，限流时更 resilient），按该值降序取前 N。
 
+    若上述两步都拿不到（东财全域限流）且配置了 TUSHARE_TOKEN，则改用 Tushare
+    moneyflow 一次性补齐最近交易日主力净流入（见 _tushare_session_flow）。
+
     所有入选股必须属于同一个交易日，避免混入不同日期的数据。
     """
     names = _candidate_pool_from_rank(min_inflow, max_stocks)
     if not names:
         names = _universe_codes(universe)
         if names:
+            # 排行不可用、退到整池时只精查流动性最好的前 N 只（universe 已按成交额降序），
+            # 避免对个股历史接口逐只请求全市场 4000+ 次。
+            if len(names) > _PRE_OPEN_UNIVERSE_PROBE_MAX:
+                names = dict(list(names.items())[:_PRE_OPEN_UNIVERSE_PROBE_MAX])
             logger.info(
-                f"{_PRE_OPEN_RANK_INDICATOR}资金流排行不可用，改用已获取的 {len(names)} 只股票池"
-                "作为盘前候选池精查最近交易日主力净流入…"
+                f"{_PRE_OPEN_RANK_INDICATOR}资金流排行不可用，改用已获取的股票池精查最近交易日主力净流入"
+                f"（取流动性前 {len(names)} 只）…"
             )
 
     if not names:
@@ -429,6 +581,11 @@ def get_stock_list_by_previous_day_flow(
 
     logger.info(f"盘前模式：从候选池取 {len(codes)} 只，精查最近交易日主力净流入…")
     flows = _ensure_prev_day_flow(codes)
+
+    if not flows:
+        # 东财全市场排行与个股历史都拿不到（全域限流）：配置了 TUSHARE_TOKEN 时
+        # 用 Tushare moneyflow 一次性补齐；仍未配置则维持“资金面筛选跳过”。
+        flows = _tushare_session_flow(codes)
 
     if not flows:
         logger.warning("未能获取任何个股的最近交易日资金流")
@@ -602,6 +759,7 @@ def pre_screen_stocks_multi_factor(
     require_macd_golden_cross: bool = True,
     min_volume_ratio: float = 0.8,
     find_early_uptrend: bool = True,  # 找早期上升趋势
+    lookup_news: bool = True,  # 消息面降级透传时置 False：关掉逐只的东财行业/新闻回查
 ) -> list[dict]:
     """
     多因子预筛选：技术面 + 资金面 + 板块热度 + 潜力识别。
@@ -620,6 +778,8 @@ def pre_screen_stocks_multi_factor(
         require_macd_golden_cross: 是否要求 MACD 金叉
         min_volume_ratio: 最小量比
         find_early_uptrend: 是否优先选择早期上升趋势（股价刚突破 MA20）
+        lookup_news: 是否允许逐只回查东财行业/板块新闻。消息面降级透传时传 False，
+            避免在东财被限流的场景下把逐只行业/新闻调用重新引爆
 
     Returns:
         通过筛选的股票列表（含潜力评分）
@@ -677,13 +837,15 @@ def pre_screen_stocks_multi_factor(
             reasons.append("无资金流向数据")
 
         # === 板块热度筛选（优先用第4步消息面筛选已附带的 sector，避免重复查询） ===
+        # lookup_news=False（消息面降级透传）时不做逐只行业回查：get_stock_sector 走
+        # 东财 info_em 且无缓存，而消息面降级正是东财被限流的场景，逐只回查会重新引爆限流。
         sector = stock.get("sector")
         if sector is None:
             if require_hot_sector and hot_sectors:
                 sector = get_stock_sector(ticker)
                 if sector and sector not in hot_sectors:
                     reasons.append(f"行业'{sector}'不在热门板块前{hot_sector_top_n}")
-            elif not require_hot_sector:
+            elif not require_hot_sector and lookup_news:
                 sector = get_stock_sector(ticker)
 
         # 记录结果
@@ -736,8 +898,9 @@ def pre_screen_stocks_multi_factor(
                 potential_score += 10
 
             # 5. 消息面加分（优先用第4步已附带的板块评分，避免重复查新闻）
+            # 降级透传时 sector 为 None 且 lookup_news=False，不会再逐只查东财新闻。
             news_score = stock.get("sector_news_score")
-            if news_score is None and sector:
+            if news_score is None and sector and lookup_news:
                 news_score = get_sector_news_sentiment(sector, days=7)
             if news_score is not None:
                 result["sector_news_score"] = news_score

@@ -88,7 +88,7 @@ def run_screener(
     console.print("  从全市场筛选主力净流入 > 0 的股票（取前 100 只）...")
 
     from tradingagents.screener.pre_screener_v2 import (
-        filter_by_news_sector,
+        apply_news_screen,
         get_last_window_note,
         get_positive_news_sectors,
         get_stock_list_by_fund_flow,
@@ -104,7 +104,11 @@ def run_screener(
     console.print(f"  主力净流入 > 0 的股票：{len(fund_flow_stocks)} 只")
 
     if not fund_flow_stocks:
-        console.print("[bold red]没有股票满足资金面条件[/bold red]")
+        console.print(
+            "[bold red]资金面筛选为空（多为东方财富排行与个股接口均被临时限流，拿不到主力净流入）。[/bold red]\n"
+            "  [dim]建议：① 在 .env 配置 TUSHARE_TOKEN（一次请求即可补齐最近交易日全市场资金流，不受东财限流影响）；"
+            "② 或等约 5–40 分钟限流恢复后重跑。[/dim]"
+        )
         return
 
     # 对资金面结果再次应用板块过滤（确保剔除科创板/北交所/ST）
@@ -116,22 +120,23 @@ def run_screener(
         return
 
     # 第 4 步：消息面筛选（近一周利好板块）
+    #   消息面是软条件而非硬门槛：东财板块资金流排行 / 成分股 / 个股新闻任意一处被限流而
+    #   拿不到数据（或本周确实无利好板块）时，不再整单中断，而是把资金面候选原样透传到
+    #   第 5 步，并据此关闭第 5 步逐只的东财行业/新闻回查（见 lookup_news）。
     console.print("\n[bold yellow]第 4 步：消息面筛选（近一周利好板块）...[/bold yellow]")
     console.print("  获取资金流入前 20 的热门板块，评估近 7 天消息面...")
     positive_sectors = get_positive_news_sectors(days=7, min_score=30, sector_top_n=20)
+    news_stocks, news_degraded = apply_news_screen(fund_flow_stocks, positive_sectors)
 
-    if not positive_sectors:
-        console.print("[bold red]没有板块近一周有利好消息，请放宽条件或稍后再试[/bold red]")
-        return
-
-    console.print(f"  利好板块 {len(positive_sectors)} 个：{', '.join(positive_sectors.keys())}")
-
-    news_stocks = filter_by_news_sector(fund_flow_stocks, positive_sectors)
-    console.print(f"  属于利好板块的股票：{len(news_stocks)} 只")
-
-    if not news_stocks:
-        console.print("[bold red]没有股票属于利好板块[/bold red]")
-        return
+    if positive_sectors:
+        console.print(f"  利好板块 {len(positive_sectors)} 个：{', '.join(positive_sectors.keys())}")
+    if news_degraded:
+        console.print(
+            "  [dim]消息面数据缺失（板块排行/成分股/新闻被限流）或无股票落入利好板块："
+            "跳过消息面过滤，透传资金面候选继续，不再中断[/dim]"
+        )
+    else:
+        console.print(f"  属于利好板块的股票：{len(news_stocks)} 只")
 
     # 第 5 步：技术指标计算 + 技术面筛选
     console.print("\n[bold yellow]第 5 步：技术指标筛选...[/bold yellow]")
@@ -145,10 +150,11 @@ def run_screener(
 
     console.print("  技术面条件：RSI 30-65（早期上升趋势）、股价>MA20、MACD 金叉、量比≥0.8")
     screened = pre_screen_stocks_multi_factor(
-        news_stocks,  # 已通过资金面 + 消息面的股票
+        news_stocks,  # 已通过资金面 + 消息面的股票（消息面降级时为透传的资金面候选）
         tech_data,
         min_main_force_inflow=0,  # 要求主力净流入
         require_hot_sector=False,  # 板块热度已在第4步消息面筛选中体现
+        lookup_news=not news_degraded,  # 消息面降级时不逐只回查东财行业/新闻
         rsi_min=30,
         rsi_max=65,
         require_above_ma20=True,
@@ -176,6 +182,17 @@ def run_screener(
     console.print("[bold green]  🎯 第一步筛选完成！找到以下潜力股（按潜力评分降序）：[/bold green]")
     console.print("[bold green]═══════════════════════════════════════════════════════════[/bold green]\n")
 
+    # 东财被限流时，腾讯实时行情（qt.gtimg.cn）通常仍可用，给潜力股补一行盘中现价。
+    # 纯展示、best-effort：取不到就整体跳过，不影响筛选结果与后续深度分析。
+    from tradingagents.screener.data_source import get_realtime_quotes_tencent
+    live_quotes: dict = {}
+    try:
+        live_quotes = get_realtime_quotes_tencent(
+            [s.get("ticker", "").split(".")[0] for s in screened]
+        )
+    except Exception as e:  # 展示增强，任何异常都不应中断选股
+        logger.debug(f"腾讯实时行情获取失败（忽略）：{e}")
+
     for i, stock in enumerate(screened, 1):
         ticker = stock.get("ticker", "")
         name = stock.get("name", "")
@@ -187,6 +204,15 @@ def run_screener(
 
         console.print(f"  [bold cyan]{i:2d}.[/bold cyan] {name} ({ticker})")
         console.print(f"      潜力评分: [bold yellow]{score}[/bold yellow] | RSI: {rsi:.1f} | 主力净流入: {inflow:.0f}万 | 板块: {sector} | 消息面: {news_score}分")
+
+        lq = live_quotes.get(ticker.split(".")[0]) if ticker else None
+        if lq and lq.get("price"):
+            seg = f"      现价: {lq['price']:.2f}"
+            if lq.get("pct_chg") is not None:
+                seg += f" | 涨跌幅: {lq['pct_chg']:+.2f}%"
+            if lq.get("turnover") is not None:
+                seg += f" | 换手率: {lq['turnover']:.2f}%"
+            console.print(seg)
 
     console.print("\n[bold green]═══════════════════════════════════════════════════════════[/bold green]")
     console.print(f"[bold green]  共找到 {len(screened)} 只潜力股[/bold green]")

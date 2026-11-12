@@ -1,7 +1,7 @@
 """股票池获取模块 - 多源回退机制获取 A 股股票列表。
 
-数据源优先级：AKShare（东方财富）> BaoStock > 内置股票池，实现在
-``data_source.get_stock_list_with_fallback``。全部是境内源或本地兜底。
+数据源优先级：AKShare（东方财富）> BaoStock > AKShare（新浪）> 本地缓存 >
+内置股票池，实现在 ``data_source.get_stock_list_with_fallback``。全部是境内源或本地兜底。
 """
 
 import logging
@@ -65,7 +65,7 @@ def get_csi300_stocks() -> list[dict[str, str]]:
     """
     获取股票池（使用多源回退机制）。
 
-    优先级：AKShare（东方财富）> BaoStock > 内置股票池。函数名里的 csi300 是历史
+    优先级：AKShare（东方财富）> BaoStock > AKShare（新浪）> 本地缓存 > 内置股票池。函数名里的 csi300 是历史
     名称，实际范畴是全 A 股再交给 filter_st_stocks 剔除。
 
     Returns:

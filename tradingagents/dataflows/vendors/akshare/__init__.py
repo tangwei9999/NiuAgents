@@ -121,6 +121,142 @@ def _normalize_date_arg(value) -> str:
     return str(value).replace("-", "").replace("/", "")
 
 
+def _normalize_ohlcv(df: pd.DataFrame) -> pd.DataFrame | None:
+    """将已重命名到 Date/Open/High/Low/Close/Volume 的框统一成 Date 索引 + 数值列（
+    三家共用的返回形状）。无可用行时返回 None，不抛错，交给回退链继续。"""
+    if df is None or df.empty:
+        return None
+    out = df.copy()
+    out["Date"] = pd.to_datetime(out["Date"], errors="coerce")
+    out = out.dropna(subset=["Date"])
+    for col in ("Open", "High", "Low", "Close", "Volume"):
+        out[col] = pd.to_numeric(out[col], errors="coerce")
+    out = out.dropna(subset=["Close", "Volume"])
+    if out.empty:
+        return None
+    return out.set_index("Date")
+
+
+def _hist_eastmoney(ak, code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """东方财富日 K（前复权，含成交量）。限流/异常抛 VendorUnavailableError 交回退链。"""
+    try:
+        df = ak.stock_zh_a_hist(
+            symbol=code, period="daily",
+            start_date=start_date, end_date=end_date, adjust="qfq",  # 前复权
+        )
+    except Exception as e:
+        msg = str(e)
+        if "限流" in msg or "Rate" in msg or "push2" in msg:
+            raise VendorUnavailableError(f"AKShare East Money rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
+    if df is None or df.empty:
+        # 东财偶在限流后立即返回空框（尤其批量负载）：重试一次再交给回退链。
+        time.sleep(1.5)
+        try:
+            df = ak.stock_zh_a_hist(
+                symbol=code, period="daily",
+                start_date=start_date, end_date=end_date, adjust="qfq",
+            )
+        except Exception as e:
+            raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
+    if df is None or df.empty:
+        return None
+    df = df.rename(columns={
+        "日期": "Date", "开盘": "Open", "最高": "High",
+        "最低": "Low", "收盘": "Close", "成交量": "Volume",
+    })
+    return _normalize_ohlcv(df)
+
+
+def _hist_tencent(ak, code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """腾讯财经日 K（列名小写、含成交量；限流较少）。"""
+    try:
+        df = ak.stock_zh_a_hist_tx(
+            symbol=code, start_date=start_date, end_date=end_date, adjust="qfq",
+        )
+    except Exception as e:
+        msg = str(e)
+        if "限流" in msg or "Rate" in msg:
+            raise VendorUnavailableError(f"AKShare Tencent rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare Tencent failed: {e}") from e
+    if df is None or df.empty:
+        return None
+    df = df.rename(columns={
+        "date": "Date", "open": "Open", "high": "High",
+        "low": "Low", "close": "Close", "volume": "Volume",
+    })
+    return _normalize_ohlcv(df)
+
+
+def _hist_sina(ak, symbol: str, code: str, start_date: str, end_date: str) -> pd.DataFrame | None:
+    """新浪财经日 K（列名小写、含成交量）。接口返回全历史，需按 [start,end] 窗口过滤。
+    symbol 必须带 .SS/.SZ 后缀才能拼出 sh/sz 前缀，否则无从区分市场。"""
+    if symbol.endswith(".SS"):
+        sina_code = f"sh{code}"
+    elif symbol.endswith(".SZ"):
+        sina_code = f"sz{code}"
+    else:
+        return None
+    try:
+        df = ak.stock_zh_a_daily(symbol=sina_code, adjust="qfq")
+    except Exception as e:
+        msg = str(e)
+        if "限流" in msg or "Rate" in msg:
+            raise VendorUnavailableError(f"AKShare Sina rate limited: {e}") from e
+        raise VendorUnavailableError(f"AKShare Sina failed: {e}") from e
+    if df is None or df.empty:
+        return None
+    df = df.rename(columns={
+        "date": "Date", "open": "Open", "high": "High",
+        "low": "Low", "close": "Close", "volume": "Volume",
+    })
+    df = _normalize_ohlcv(df)
+    if df is None:
+        return None
+    # 对齐东财/腾讯的日期窗口：新浪接口返回全历史，按 [start,end] 过滤（同时防前视）。
+    lo = pd.to_datetime(start_date)
+    hi = pd.to_datetime(end_date)
+    df = df[(df.index >= lo) & (df.index <= hi)]
+    return df if not df.empty else None
+
+
+def _fetch_ohlcv_with_fallback(
+    symbol: str, code: str, start_date: str, end_date: str
+) -> tuple[pd.DataFrame | None, bool]:
+    """东财→腾讯→新浪的同库内回退：任一源取到即用。
+
+    三家都是 AKShare 内的国内源、都不回退 Yahoo（保持 A 股口径一致）。返回
+    (df, any_unavailable)：全失败时 any_unavailable 为真表示至少一家是“限流/取数
+    失败”（unavailable），否则是“三家都返回空”（确无数据）——供调用方选对应哨兵语义。
+    """
+    import akshare as ak
+
+    sources = (
+        ("East Money", lambda: _hist_eastmoney(ak, code, start_date, end_date)),
+        ("Tencent", lambda: _hist_tencent(ak, code, start_date, end_date)),
+        ("Sina", lambda: _hist_sina(ak, symbol, code, start_date, end_date)),
+    )
+    any_unavailable = False
+    for label, fetch in sources:
+        try:
+            df = fetch()
+        except VendorUnavailableError as e:
+            any_unavailable = True
+            logger.warning(
+                "AKShare %s price source unavailable for %s: %s; trying next",
+                label, symbol, e,
+            )
+            continue
+        if df is not None and not df.empty:
+            if label != "East Money":
+                logger.info(
+                    "AKShare %s served OHLCV for %s (East Money unavailable/empty)",
+                    label, symbol,
+                )
+            return df, any_unavailable
+    return None, any_unavailable
+
+
 def get_stock_data(
     symbol: str,
     start_date: str | None = None,
@@ -128,7 +264,7 @@ def get_stock_data(
     **kwargs
 ) -> pd.DataFrame:
     """
-    Get OHLCV stock price data from AKShare.
+    Get OHLCV stock price data from AKShare, with in-vendor fallback.
 
     Args:
         symbol: Ticker symbol (e.g., "600519.SS")
@@ -136,78 +272,38 @@ def get_stock_data(
         end_date: End date in YYYYMMDD format (default: today)
 
     Returns:
-        DataFrame with columns: Date, Open, High, Low, Close, Volume
+        DataFrame with columns: Open, High, Low, Close, Volume (Date index)
+
+    东财 push2 被限流时，依次回退腾讯、新浪两个不同主机的 AKShare 源（都仍是国内
+    口径、不回退 Yahoo）；三家都取不到时，任一限流→VendorUnavailableError，全部确无
+    数据→NoMarketDataError，保持 router 原有哨兵语义。get_indicators 内部走本函数，
+    技术指标因此一并受保护。
     """
     if not _check_akshare_available():
         raise VendorUnavailableError("AKShare is not installed")
-
-    import akshare as ak
 
     code = _convert_ticker_to_akshare_code(symbol)
 
     if not start_date or not end_date:
         start_date, end_date = _get_date_range(90)
-    # East Money needs compact YYYYMMDD; ISO separators yield empty frames.
+    # East Money / Tencent need compact YYYYMMDD; ISO separators yield empty frames.
     start_date = _normalize_date_arg(start_date)
     end_date = _normalize_date_arg(end_date)
 
-    try:
-        # Try East Money first (most comprehensive)
-        df = ak.stock_zh_a_hist(
-            symbol=code,
-            period="daily",
-            start_date=start_date,
-            end_date=end_date,
-            adjust="qfq"  # 前复权
+    df, any_unavailable = _fetch_ohlcv_with_fallback(symbol, code, start_date, end_date)
+    if df is not None and not df.empty:
+        return df
+
+    if any_unavailable:
+        # 任一源为“限流/取数失败”→报“vendor 层不可用”→ router 返回 DATA_UNAVAILABLE 哨兵
+        # （而不是“该股票无数据”，避免把可重试的限流误读为标的无覆盖）。
+        raise VendorUnavailableError(
+            f"AKShare A-share price data unavailable for {symbol} "
+            f"(East Money, Tencent and Sina all throttled or failed)"
         )
-    except Exception as e:
-        error_msg = str(e)
-        if "限流" in error_msg or "Rate" in error_msg or "push2" in error_msg:
-            raise VendorUnavailableError(f"AKShare East Money rate limited: {e}") from e
-        raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
-
-    # East Money occasionally returns an empty frame right after throttling
-    # (especially under batch analysis load); retry once before giving up.
-    if df.empty:
-        time.sleep(1.5)
-        try:
-            df = ak.stock_zh_a_hist(
-                symbol=code,
-                period="daily",
-                start_date=start_date,
-                end_date=end_date,
-                adjust="qfq"
-            )
-        except Exception as e:
-            raise VendorUnavailableError(f"AKShare East Money failed: {e}") from e
-
-    if df.empty:
-        # Raised outside the request try/except so the router can treat it as
-        # "no data" instead of misclassifying it as a vendor failure.
-        raise NoMarketDataError(f"No data for {symbol} from AKShare East Money")
-
-    # Rename columns to match expected format
-    df = df.rename(columns={
-        "日期": "Date",
-        "开盘": "Open",
-        "最高": "High",
-        "最低": "Low",
-        "收盘": "Close",
-        "成交量": "Volume",
-    })
-
-    # Ensure correct data types
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Open"] = pd.to_numeric(df["Open"], errors="coerce")
-    df["High"] = pd.to_numeric(df["High"], errors="coerce")
-    df["Low"] = pd.to_numeric(df["Low"], errors="coerce")
-    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-    df["Volume"] = pd.to_numeric(df["Volume"], errors="coerce")
-
-    df = df.dropna(subset=["Close", "Volume"])
-    df = df.set_index("Date")
-
-    return df
+    raise NoMarketDataError(
+        f"No OHLCV data for {symbol} from AKShare (East Money/Tencent/Sina)"
+    )
 
 
 def get_indicators(

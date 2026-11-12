@@ -196,6 +196,7 @@ print(decision)
 | [完整架构](docs/architecture_full.html) | 端到端数据流与模块交互全景 |
 | [详细学习指南](docs/learning_guide_detailed.html) | 逐模块讲解，适合上手源码 |
 | [学习计划](docs/learning_plan.html) | 分阶段阅读与练习路线 |
+| [智能体开发精进手册](docs/agent_mastery_playbook.html) | Java 工程师视角：十大设计精髓、七天读码路线、生产级 0→1 十步（含 OpenSpec 流程）、安全与能力治理、评测方法学与置信度校准、可观测 SLO 与发布工程 |
 
 ---
 

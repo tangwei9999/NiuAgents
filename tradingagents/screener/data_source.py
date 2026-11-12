@@ -13,6 +13,7 @@
 import functools
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -364,6 +365,78 @@ def get_technical_data_akshare_sina(ticker: str, days: int = 90) -> dict | None:
         return None
 
 
+def get_stock_list_akshare_sina() -> list[dict[str, str]]:
+    """从 AKShare（新浪财经）获取 A 股股票列表。
+
+    走新浪主机（``stock_zh_a_spot``），与东财 spot 是不同端点：东财被限流时
+    这里通常仍可取到，作为股票池的第三个在线源，避免直接降级到缓存/内置池。
+    新浪快照不含市值，按成交额降序近似“大盘在前”，交由下游过滤。
+    """
+    try:
+        import akshare as ak
+
+        df = ak.stock_zh_a_spot()
+        if df is None or df.empty:
+            raise NoDataError("AKShare 新浪返回空数据")
+
+        code_col = "代码" if "代码" in df.columns else df.columns[0]
+        name_col = "名称" if "名称" in df.columns else df.columns[1]
+        price_col = "最新价" if "最新价" in df.columns else None
+        amount_col = "成交额" if "成交额" in df.columns else None
+
+        stocks = []
+        for _, row in df.iterrows():
+            raw_code = str(row[code_col])
+            # 新浪代码可能带市场前缀（sh600519），取末 6 位数字
+            code = raw_code[-6:] if len(raw_code) >= 6 else raw_code
+            name = str(row[name_col])
+
+            if "ST" in name.upper():
+                continue
+
+            if price_col is not None:
+                try:
+                    if float(row[price_col]) <= 0:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+
+            if code.startswith("6"):
+                ticker = f"{code}.SS"
+            elif code.startswith(("0", "3")):
+                ticker = f"{code}.SZ"
+            else:
+                continue
+
+            amount = 0.0
+            if amount_col is not None:
+                try:
+                    amount = float(row[amount_col])
+                except (ValueError, TypeError):
+                    amount = 0.0
+
+            stocks.append({
+                "ticker": ticker,
+                "name": name,
+                "code": code,
+                "market_cap": 0,  # 新浪快照不提供市值
+                "_amount": amount,  # 仅用于排序，返回前剔除
+            })
+
+        stocks.sort(key=lambda s: s.get("_amount", 0), reverse=True)
+        for s in stocks:
+            s.pop("_amount", None)
+        logger.info(f"AKShare 新浪获取到 {len(stocks)} 只 A 股")
+        return stocks
+
+    except ImportError:
+        raise DataSourceUnavailableError("AKShare 未安装") from None
+    except Exception as e:
+        if "Too Many" in str(e) or "Rate" in str(e) or "限流" in str(e):
+            raise DataSourceUnavailableError(f"AKShare 新浪限流：{e}") from e
+        raise DataSourceError(f"AKShare 新浪获取失败：{e}") from e
+
+
 # ============================================================
 # 数据源 4: AKShare 东方财富（数据最全但容易限流）
 # ============================================================
@@ -481,6 +554,90 @@ def get_technical_data_akshare_em(ticker: str, days: int = 90) -> dict | None:
 
 
 # ============================================================
+# 腾讯实时行情（补充源：现价 / 涨跌幅 / 换手率，非 K 线）
+# ============================================================
+
+# 东财被限流时，腾讯 qt.gtimg.cn 通常仍可用；用于给候选股补一个盘中现价。
+# 与上面各档 K 线源是两个用途：这里只取当前快照，不取历史。
+_TENCENT_QUOTE_URL = "http://qt.gtimg.cn/q="
+_TENCENT_BATCH = 60
+_TENCENT_LINE_RE = re.compile(r'v_(?:sh|sz)(\d{6})="([^"]*)"')
+
+
+def _tencent_symbol(code: str) -> str | None:
+    """6 位代码（可带 .SS/.SZ 后缀）转腾讯行情 symbol（sh/sz 前缀）；非沪深返回 None。"""
+    code = str(code).split(".")[0].zfill(6)
+    if code.startswith("6"):
+        return f"sh{code}"
+    if code.startswith(("0", "3")):
+        return f"sz{code}"
+    return None
+
+
+def _gtimg_num(fields: list[str], idx: int) -> float | None:
+    """从 ~ 分隔字段取数值；越界/空串/非数都返回 None。"""
+    try:
+        raw = fields[idx]
+    except IndexError:
+        return None
+    if raw is None or raw == "":
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def get_realtime_quotes_tencent(codes, timeout=net.DEFAULT_TIMEOUT) -> dict[str, dict]:
+    """批量取腾讯实时行情（现价 / 涨跌幅 / 换手率 / 成交额），best-effort。
+
+    纯补充源：任何网络 / 解析失败都只跳过、不抛出、不阻断主流程，返回成功
+    解析到的 ``{6位代码: {price, pct_chg, turnover, amount, ...}}``。
+    """
+    want: set[str] = set()
+    syms: list[str] = []
+    for c in codes or []:
+        sym = _tencent_symbol(c)
+        if sym:
+            want.add(sym[2:])
+            syms.append(sym)
+    if not syms:
+        return {}
+
+    import requests
+
+    result: dict[str, dict] = {}
+    for i in range(0, len(syms), _TENCENT_BATCH):
+        url = _TENCENT_QUOTE_URL + ",".join(syms[i:i + _TENCENT_BATCH])
+        try:
+            with net.bounded_sockets():
+                resp = requests.get(url, timeout=timeout)
+            resp.encoding = "gbk"  # gtimg 返回 GBK
+            text = resp.text
+        except Exception as e:
+            logger.debug(f"腾讯实时行情获取失败（忽略）：{e}")
+            continue
+        for code, payload in _TENCENT_LINE_RE.findall(text):
+            if code not in want:
+                continue
+            f = payload.split("~")
+            price = _gtimg_num(f, 3)
+            if price is None:
+                continue
+            result[code] = {
+                "name": f[1] if len(f) > 1 else "",
+                "price": price,
+                "prev_close": _gtimg_num(f, 4),
+                "pct_chg": _gtimg_num(f, 32),
+                "high": _gtimg_num(f, 33),
+                "low": _gtimg_num(f, 34),
+                "amount": _gtimg_num(f, 37),     # 成交额（万元）
+                "turnover": _gtimg_num(f, 38),   # 换手率（%）
+            }
+    return result
+
+
+# ============================================================
 # 内置股票池（最后兜底）
 # ============================================================
 
@@ -567,9 +724,10 @@ def get_stock_list_with_fallback() -> list[dict[str, str]]:
     """
     获取股票列表（带回退机制）。
 
-    优先级：AKShare（东方财富）> BaoStock > 本地缓存 > 内置股票池。
-    两个在线源取数成功时会写回本地缓存；都失败时优先用最近一次成功的
-    缓存快照（避免限流日被降级到 38 只内置池），没有缓存才落到内置池。
+    优先级：AKShare（东方财富）> BaoStock > AKShare（新浪）> 本地缓存 > 内置股票池。
+    任一在线源取数成功都会写回本地缓存；三个在线源都失败时优先用最近一次
+    成功的缓存快照（避免限流日被降级到 38 只内置池），没有缓存才落到内置池。
+    新浪与东财是不同主机，东财被限流时通常仍可取到。
 
     Returns:
         股票列表
@@ -602,13 +760,26 @@ def get_stock_list_with_fallback() -> list[dict[str, str]]:
             logger.warning(f"BaoStock 失败：{e}")
             errors.append(f"BaoStock: {e}")
 
-    # 3. 两个在线源都不可用：优先用上次成功取数的本地缓存（比内置 38 只全得多）
+    # 3. 尝试 AKShare（新浪）- 与东财不同主机，东财限流时常仍可取到
+    if get_akshare_available():
+        try:
+            logger.info("尝试从 AKShare（新浪）获取股票列表...")
+            stocks = get_stock_list_akshare_sina()
+            if stocks:
+                logger.info(f"✓ AKShare 新浪 成功获取 {len(stocks)} 只股票")
+                _save_stock_list_cache(stocks)
+                return stocks
+        except DataSourceError as e:
+            logger.warning(f"AKShare 新浪失败：{e}")
+            errors.append(f"AKShare新浪: {e}")
+
+    # 4. 三个在线源都不可用：优先用上次成功取数的本地缓存（比内置 38 只全得多）
     cached = _load_stock_list_cache()
     if cached:
         logger.info(f"在线源均不可用，改用本地股票池缓存（{len(cached)} 只）")
         return cached
 
-    # 4. 没有缓存才回退到内置股票池
+    # 5. 没有缓存才回退到内置股票池
     try:
         logger.info("回退到内置股票池...")
         stocks = get_stock_list_builtin()
