@@ -354,47 +354,80 @@ def _get_fund_flow_rank_cached() -> pd.DataFrame | None:
     return _fund_flow_rank_cache.copy() if _fund_flow_rank_cache is not None else None
 
 
-def get_stock_list_by_previous_day_flow(
-    min_inflow: float = 0,
-    max_stocks: int = 200,
-) -> list[dict[str, str]]:
-    """盘前/非交易时段的资金面筛选：以最近一个交易日的净流入为准。
+def _candidate_pool_from_rank(min_inflow: float, max_stocks: int) -> dict[str, str]:
+    """盘前候选池：从近 5 日全市场资金流排行取活跃股，返回 {6位代码: 名称}。
 
-    东财没有“按指定历史交易日批量取全市场个股资金流”的接口，因此分两步：
-    1) 用近 5 日排行取活跃候选池（1 次调用，含最近交易日）；
-    2) 并发精查候选池每只股票的最近交易日主力净流入，按该值降序取前 N。
-
-    候选池仅 max_stocks 的 2 倍，精查成本可控；且所有入选股必须属于
-    同一个交易日，避免混入不同日期的数据。
+    排行接口不可用（限流/网络异常）或无有效数据时返回空 dict，由调用方回退到
+    已获取的股票池，避免整个资金面筛选因单次排行失败而中断。
     """
     try:
         import akshare as ak
         rank = ak.stock_individual_fund_flow_rank(indicator=_PRE_OPEN_RANK_INDICATOR)
     except Exception as e:
         logger.warning(f"获取{_PRE_OPEN_RANK_INDICATOR}资金流排行失败：{e}")
-        return []
+        return {}
 
     if rank is None or rank.empty:
-        logger.warning(f"{_PRE_OPEN_RANK_INDICATOR}资金流排行为空，资金面筛选跳过")
-        return []
+        logger.warning(f"{_PRE_OPEN_RANK_INDICATOR}资金流排行为空")
+        return {}
 
     rank_col = _find_inflow_col(rank)
     if rank_col is None:
         logger.warning(f"{_PRE_OPEN_RANK_INDICATOR}排行缺少主力净流入列，可用列：{rank.columns.tolist()}")
-        return []
+        return {}
 
     pool = rank.assign(
         _inflow=pd.to_numeric(rank[rank_col], errors="coerce")
     ).sort_values("_inflow", ascending=False)
     pool = pool[pool["_inflow"] > min_inflow].head(max_stocks * _PRE_OPEN_CANDIDATE_MULT)
 
-    names = dict(zip(pool["代码"].astype(str).str.zfill(6), pool["名称"], strict=False))
-    codes = list(names.keys())
-    if not codes:
-        logger.warning(f"{_PRE_OPEN_RANK_INDICATOR}排行无净流入个股，资金面筛选跳过")
+    return dict(zip(pool["代码"].astype(str).str.zfill(6), pool["名称"], strict=False))
+
+
+def _universe_codes(universe) -> dict[str, str]:
+    """把已获取的股票池转成 {6位代码: 名称}，仅保留可转 ticker 的沪深代码。"""
+    mapping: dict[str, str] = {}
+    for stock in universe or []:
+        code = str(stock.get("ticker", "")).split(".")[0]
+        if not (code.isdigit() and len(code) == 6):
+            continue
+        if _code_to_ticker(code) is None:  # 北交所等无法转 ticker，跳过
+            continue
+        mapping[code] = str(stock.get("name", ""))
+    return mapping
+
+
+def get_stock_list_by_previous_day_flow(
+    min_inflow: float = 0,
+    max_stocks: int = 200,
+    universe=None,
+) -> list[dict[str, str]]:
+    """盘前/非交易时段的资金面筛选：以最近一个交易日的净流入为准。
+
+    东财没有“按指定历史交易日批量取全市场个股资金流”的接口，因此分两步：
+    1) 用近 5 日排行取活跃候选池（1 次调用，含最近交易日）；排行不可用（限流/
+       网络异常）时回退到调用方传入的已获取股票池，保证筛选不因此中断；
+    2) 并发精查候选池每只股票的最近交易日主力净流入（走个股历史接口，与全市场
+       排行是不同端点，限流时更 resilient），按该值降序取前 N。
+
+    所有入选股必须属于同一个交易日，避免混入不同日期的数据。
+    """
+    names = _candidate_pool_from_rank(min_inflow, max_stocks)
+    if not names:
+        names = _universe_codes(universe)
+        if names:
+            logger.info(
+                f"{_PRE_OPEN_RANK_INDICATOR}资金流排行不可用，改用已获取的 {len(names)} 只股票池"
+                "作为盘前候选池精查最近交易日主力净流入…"
+            )
+
+    if not names:
+        logger.warning("资金流排行与股票池均不可用，资金面筛选跳过")
         return []
 
-    logger.info(f"盘前模式：从{_PRE_OPEN_RANK_INDICATOR}排行取 {len(codes)} 只候选，精查最近交易日主力净流入…")
+    codes = list(names.keys())
+
+    logger.info(f"盘前模式：从候选池取 {len(codes)} 只，精查最近交易日主力净流入…")
     flows = _ensure_prev_day_flow(codes)
 
     if not flows:
@@ -421,16 +454,23 @@ def get_stock_list_by_previous_day_flow(
     return stocks
 
 
-def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) -> list[dict[str, str]]:
+def get_stock_list_by_fund_flow(
+    min_inflow: float = 0,
+    max_stocks: int = 200,
+    universe=None,
+) -> list[dict[str, str]]:
     """
     从资金流向排名中获取股票列表。
 
-    盘前/非交易时段今日净流入全为 NaN 而筛出 0 只时，自动改用最近一个
-    交易日的净流入（见 get_stock_list_by_previous_day_flow）。
+    时间口径：交易日 09:30 开盘后（含盘后）以“今日”净流入为准；盘前/非
+    交易时段今日净流入全为 NaN 而筛出 0 只时，自动改用最近一个交易日的净流入
+    （见 get_stock_list_by_previous_day_flow）。
 
     Args:
         min_inflow: 最小主力净流入（元）
         max_stocks: 最大股票数量
+        universe: 已获取的股票池（[{"ticker", "name"}]），在全市场排行接口不可用
+            （限流/网络异常）时作为盘前候选池的兜底，避免筛选直接中断
 
     Returns:
         股票列表 [{"ticker": "600519.SS", "name": "贵州茅台"}, ...]
@@ -438,16 +478,25 @@ def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) ->
     if not _today_flow_expected_generated():
         # 开盘前东财今日资金流必然未生成，省去一次 30s+ 的全市场排行请求
         logger.info("当前为盘前/非交易时段，直接按最近交易日主力净流入筛选")
-        return get_stock_list_by_previous_day_flow(min_inflow=min_inflow, max_stocks=max_stocks)
+        return get_stock_list_by_previous_day_flow(
+            min_inflow=min_inflow, max_stocks=max_stocks, universe=universe
+        )
 
     df = _get_fund_flow_rank_cached()
     if df is None:
-        return []
+        # 全市场“今日”排行请求失败（限流/网络异常）：回退到最近交易日精查，
+        # 避免因单次排行不可用而中断整个资金面筛选。
+        logger.info("今日资金流排行获取失败，改用最近交易日主力净流入筛选")
+        return get_stock_list_by_previous_day_flow(
+            min_inflow=min_inflow, max_stocks=max_stocks, universe=universe
+        )
 
     inflow_col = _find_inflow_col(df)
     if inflow_col is None:
-        logger.warning(f"无法找到主力净流入列，可用列：{df.columns.tolist()}")
-        return []
+        logger.warning(f"无法找到主力净流入列，可用列：{df.columns.tolist()}，改用最近交易日数据")
+        return get_stock_list_by_previous_day_flow(
+            min_inflow=min_inflow, max_stocks=max_stocks, universe=universe
+        )
 
     # 数值化但保留 NaN：NaN 与阈值比较为假，盘前全 NaN 时自然筛出 0 只并触发降级
     inflow = pd.to_numeric(df[inflow_col], errors="coerce")
@@ -457,7 +506,9 @@ def get_stock_list_by_fund_flow(min_inflow: float = 0, max_stocks: int = 200) ->
         # 今日资金数据尚未生成（盘前/周末/节假日）：改用最近一个交易日，
         # 避免整个选股流程在“没有股票满足资金面条件”处直接终止。
         logger.info("今日主力净流入无满足条件的股票（可能为盘前/非交易时段），改用最近交易日数据")
-        return get_stock_list_by_previous_day_flow(min_inflow=min_inflow, max_stocks=max_stocks)
+        return get_stock_list_by_previous_day_flow(
+            min_inflow=min_inflow, max_stocks=max_stocks, universe=universe
+        )
 
     stocks = []
     for _, row in filtered.iterrows():

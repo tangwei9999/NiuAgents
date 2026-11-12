@@ -93,7 +93,9 @@ def run_screener(
         get_positive_news_sectors,
         get_stock_list_by_fund_flow,
     )
-    fund_flow_stocks = get_stock_list_by_fund_flow(min_inflow=0, max_stocks=100)
+    # universe=stocks：盘前/限流时，若全市场资金流排行不可用，用已获取的股票池
+    # 兜底做候选池精查最近交易日净流入，避免“没有股票满足资金面条件”直接中断。
+    fund_flow_stocks = get_stock_list_by_fund_flow(min_inflow=0, max_stocks=100, universe=stocks)
 
     # 盘前/非交易时段东财“今日”资金流尚未生成，已自动改用最近一个交易日
     window = get_last_window_note()
