@@ -11,8 +11,10 @@
 """
 
 import functools
+import json
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pandas as pd
 
@@ -496,6 +498,68 @@ def get_stock_list_builtin() -> list[dict[str, str]]:
 
 
 # ============================================================
+# 股票池本地缓存（在线源都失败时的兜底，成功取数时写回）
+# ============================================================
+
+# 仅在 AKShare 与 BaoStock 都取不到时读取，避免限流日被降级到 38 只内置池；
+# 每次在线取数成功都会覆盖写回，正常每天跑时缓存基本就是昨天的快照。
+# 次新股即使缓存几天没更新也几乎不受影响：技术面筛选要 ~20-60 根 K 线，
+# 刚上市的股票本来就进不了最终推荐。
+_STOCK_LIST_CACHE = Path.home() / ".tradingagents" / "cache" / "a_stock_list.json"
+_STOCK_LIST_CACHE_WARN_DAYS = 7
+
+
+def _cache_age_days(cached_date: str) -> int | None:
+    """缓存快照距今天数；日期无效返回 None。"""
+    try:
+        cached = datetime.strptime(cached_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+    return (datetime.now() - cached).days
+
+
+def _save_stock_list_cache(stocks: list[dict]) -> None:
+    """把一次成功取到的股票池落盘（尽力而为，失败不影响主流程）。"""
+    try:
+        _STOCK_LIST_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "count": len(stocks),
+            "stocks": stocks,
+        }
+        tmp = _STOCK_LIST_CACHE.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(_STOCK_LIST_CACHE)  # 原子替换，避免读到写一半的文件
+        logger.debug(f"股票池缓存已更新：{len(stocks)} 只 → {_STOCK_LIST_CACHE}")
+    except Exception as e:
+        logger.debug(f"写入股票池缓存失败（忽略）：{e}")
+
+
+def _load_stock_list_cache() -> list[dict] | None:
+    """读取最近一次成功取数的股票池快照；无缓存/损坏返回 None。"""
+    try:
+        if not _STOCK_LIST_CACHE.exists():
+            return None
+        payload = json.loads(_STOCK_LIST_CACHE.read_text(encoding="utf-8"))
+        stocks = payload.get("stocks")
+        if not stocks:
+            return None
+        cached_date = str(payload.get("date", ""))
+        age_days = _cache_age_days(cached_date)
+        if age_days is not None and age_days > _STOCK_LIST_CACHE_WARN_DAYS:
+            logger.warning(
+                f"使用 {cached_date} 的股票池缓存（{len(stocks)} 只，已 {age_days} 天），"
+                "可能缺少此后新上市的股票"
+            )
+        else:
+            logger.info(f"读取到股票池缓存：{len(stocks)} 只（{cached_date}）")
+        return stocks
+    except Exception as e:
+        logger.warning(f"读取股票池缓存失败（忽略）：{e}")
+        return None
+
+
+# ============================================================
 # 统一回退接口
 # ============================================================
 
@@ -503,7 +567,9 @@ def get_stock_list_with_fallback() -> list[dict[str, str]]:
     """
     获取股票列表（带回退机制）。
 
-    优先级：AKShare（东方财富）> BaoStock > 内置股票池
+    优先级：AKShare（东方财富）> BaoStock > 本地缓存 > 内置股票池。
+    两个在线源取数成功时会写回本地缓存；都失败时优先用最近一次成功的
+    缓存快照（避免限流日被降级到 38 只内置池），没有缓存才落到内置池。
 
     Returns:
         股票列表
@@ -517,6 +583,7 @@ def get_stock_list_with_fallback() -> list[dict[str, str]]:
             stocks = get_stock_list_akshare()
             if stocks:
                 logger.info(f"✓ AKShare 成功获取 {len(stocks)} 只股票")
+                _save_stock_list_cache(stocks)
                 return stocks
         except DataSourceError as e:
             logger.warning(f"AKShare 失败：{e}")
@@ -529,12 +596,19 @@ def get_stock_list_with_fallback() -> list[dict[str, str]]:
             stocks = get_stock_list_baostock()
             if stocks:
                 logger.info(f"✓ BaoStock 成功获取 {len(stocks)} 只股票")
+                _save_stock_list_cache(stocks)
                 return stocks
         except DataSourceError as e:
             logger.warning(f"BaoStock 失败：{e}")
             errors.append(f"BaoStock: {e}")
 
-    # 3. 回退到内置股票池
+    # 3. 两个在线源都不可用：优先用上次成功取数的本地缓存（比内置 38 只全得多）
+    cached = _load_stock_list_cache()
+    if cached:
+        logger.info(f"在线源均不可用，改用本地股票池缓存（{len(cached)} 只）")
+        return cached
+
+    # 4. 没有缓存才回退到内置股票池
     try:
         logger.info("回退到内置股票池...")
         stocks = get_stock_list_builtin()

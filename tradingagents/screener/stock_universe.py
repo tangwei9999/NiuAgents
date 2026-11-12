@@ -53,7 +53,7 @@ def _get_builtin_stocks() -> list[dict[str, str]]:
         {"ticker": "600031.SS", "name": "三一重工"},
         # 其他蓝筹
         {"ticker": "600900.SS", "name": "长江电力"},
-        {"ticker": "601318.SS", "name": "中国太保"},
+        {"ticker": "601601.SS", "name": "中国太保"},
         {"ticker": "600048.SS", "name": "保利发展"},
         {"ticker": "000002.SZ", "name": "万科 A"},
         {"ticker": "601138.SS", "name": "工业富联"},
